@@ -14,7 +14,9 @@
 #include <map>
 #include <functional>
 #include <mutex>
+#include "common.h"
 
+#ifdef REMUX
 #define TYPE_VIDEO_H264 0x1b
 //H.265 video
 #define TYPE_VIDEO_H265 0x24
@@ -34,23 +36,24 @@ public:
         std::copy(packet, packet + 188, tsPacket);  // Copy TS packet data
     }
 };
-
+#endif
 class MpegTsDemuxer {
 public:
     MpegTsDemuxer();
 
     virtual ~MpegTsDemuxer();
 
-    uint8_t decode(SimpleBuffer &rIn);
-
-    // added for remux
+#ifdef REMUX
     uint8_t decode(SimpleBuffer &rIn, std::vector<TSPacket>& packetVector, std::vector<EsFrame>& esFrameVector);
+#else
+    uint8_t decode(SimpleBuffer &rIn);
+#endif
 
     std::function<void(const EsFrame& pEs)> esOutCallback = nullptr;
     std::function<void(uint64_t lPcr)> pcrOutCallback = nullptr;
     std::function<void(const std::string&)> streamInfoCallback = nullptr;
 
-
+#ifdef REMUX
     // added for remux
     // Function to get EsFrame for a given PID
     EsFrame* getH264Frame() {
@@ -62,6 +65,7 @@ public:
         }
         return nullptr;  // Return nullptr if EsFrame not found for the given PID
     }
+#endif
 
     // stream, pid
     std::map<uint8_t, int> mStreamPidMap;
@@ -75,8 +79,10 @@ public:
     PMTHeader mPmtHeader;
     bool mPmtIsValid = false;
 
+#ifdef REMUX
     // added for remux
     int32_t videoFrameNumber;
+#endif
 
 private:
     // pid, Elementary data frame

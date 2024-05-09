@@ -8,6 +8,8 @@
 
 #include <stdint.h>
 
+#define REMUX
+
 class MpegTsAdaptationFieldType {
 public:
     // Reserved for future use by ISO/IEC

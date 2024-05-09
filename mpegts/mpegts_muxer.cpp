@@ -7,14 +7,19 @@ static const uint16_t MPEGTS_NULL_PACKET_PID = 0x1FFF;
 static const uint16_t MPEGTS_PAT_PID         = 0x0000;
 static const uint32_t MPEGTS_PAT_INTERVAL        = 20;
 
+#ifdef REMUX
 MpegTsMuxer::MpegTsMuxer(std::map<uint8_t, int> lStreamPidMap, uint16_t lPmtPid, uint16_t lPcrPid,  MuxType lType, uint8_t uCc) {
+#else
+MpegTsMuxer::MpegTsMuxer(std::map<uint8_t, int> lStreamPidMap, uint16_t lPmtPid, uint16_t lPcrPid,  MuxType lType) {
+#endif
     mPmtPid = lPmtPid;
     mStreamPidMap = lStreamPidMap;
     mPcrPid = lPcrPid;
     mMuxType = lType;
-
+#ifdef REMUX
     // added for remux
     MpegTsMuxer::initCc(lPcrPid, uCc);
+#endif
 }
 
 MpegTsMuxer::~MpegTsMuxer() {
@@ -121,171 +126,27 @@ void MpegTsMuxer::createPmt(SimpleBuffer &rSb, std::map<uint8_t, int> lStreamPid
 
 void MpegTsMuxer::createPes(EsFrame &rFrame, SimpleBuffer &rSb) {
     bool lFirst = true;
-    while (!rFrame.mData->empty()) {
-        SimpleBuffer lPacket;
-
-        TsHeader lTsHeader;
-        lTsHeader.mPid = rFrame.mPid;
-        lTsHeader.mAdaptationFieldControl = MpegTsAdaptationFieldType::mPayloadOnly;
-        lTsHeader.mContinuityCounter = getCc(rFrame.mStreamType);
-
-        if (lFirst) {
-            lTsHeader.mPayloadUnitStartIndicator = 0x01;
-            if (rFrame.mPid == mPcrPid) {
-                lTsHeader.mAdaptationFieldControl |= 0x02;
-                AdaptationFieldHeader adapt_field_header;
-                adapt_field_header.mAdaptationFieldLength = 0x07;
-                adapt_field_header.mRandomAccessIndicator = rFrame.mRandomAccess;
-                adapt_field_header.mPcrFlag = 0x01;
-
-                lTsHeader.encode(lPacket);
-                adapt_field_header.encode(lPacket);
-                writePcr(lPacket, rFrame.mPcr);
-            } else if (rFrame.mRandomAccess) {
-                lTsHeader.mAdaptationFieldControl |= 0x02;
-                AdaptationFieldHeader adapt_field_header;
-                adapt_field_header.mAdaptationFieldLength = 0x01;
-                adapt_field_header.mRandomAccessIndicator = rFrame.mRandomAccess;
-
-                lTsHeader.encode(lPacket);
-                adapt_field_header.encode(lPacket);
-
-            } else{
-                lTsHeader.encode(lPacket);
-            }
-
-            PESHeader lPesHeader;
-            lPesHeader.mPacketStartCode = 0x000001;
-            lPesHeader.mStreamId = rFrame.mStreamId;
-            lPesHeader.mMarkerBits = 0x02;
-            lPesHeader.mOriginalOrCopy = 0x01;
-
-            if (rFrame.mPts != rFrame.mDts) {
-                lPesHeader.mPtsDtsFlags = 0x03;
-                lPesHeader.mHeaderDataLength = 0x0A;
-            } else {
-                lPesHeader.mPtsDtsFlags = 0x2;
-                lPesHeader.mHeaderDataLength = 0x05;
-            }
-
-            uint32_t lPesSize = (lPesHeader.mHeaderDataLength + rFrame.mData->size() + 3);
-            lPesHeader.mPesPacketLength = lPesSize > 0xffff ? 0 : lPesSize;
-            lPesHeader.encode(lPacket);
-
-            if (lPesHeader.mPtsDtsFlags == 0x03) {
-                writePts(lPacket, 3, rFrame.mPts);
-                writePts(lPacket, 1, rFrame.mDts);
-            } else {
-                writePts(lPacket, 2, rFrame.mPts);
-            }
-        } else {
-            lTsHeader.encode(lPacket);
-        }
-
-        uint32_t lPos = lPacket.size();
-        uint32_t lBodySize = 188 - lPos;
-
-        std::vector<uint8_t> lFiller(lBodySize, 0x00);
-        lPacket.append((const uint8_t *)lFiller.data(),lFiller.size());
-
-        lPacket.skip(lPos);
-
-        uint32_t lInSize = rFrame.mData->size() - rFrame.mData->pos();
-        if (lBodySize <=
-            lInSize) {
-            lPacket.setData(lPos, rFrame.mData->data()+rFrame.mData->pos(), lBodySize);
-            rFrame.mData->skip(lBodySize);
-        } else {
-            uint16_t lStuffSize = lBodySize - lInSize;
-
-            //Take care of the case 1 stuffing byte
-
-            if (lTsHeader.mAdaptationFieldControl == MpegTsAdaptationFieldType::mAdaptionOnly ||
-                lTsHeader.mAdaptationFieldControl == MpegTsAdaptationFieldType::mPayloadAdaptionBoth) {
-                uint8_t* lpBase = lPacket.data() + 5 + lPacket.data()[4];
-                    if (lFirst) {
-                        //We need to move the PES header
-                        size_t pesHeaderSize = lPos - (lPacket.data()[4] + 5);
-                        uint8_t *pesHeader = new uint8_t[pesHeaderSize];
-                        memcpy(pesHeader,lpBase,pesHeaderSize);
-                        memcpy(lpBase+lStuffSize,pesHeader,pesHeaderSize);
-                        delete[] pesHeader;
-                    } else {
-                        lPacket.setData(lpBase - lPacket.data() + lStuffSize, lpBase,
-                                         lPacket.data() + lPacket.pos() - lpBase);
-                    }
-
-                   //
-                    memset(lpBase, 0xff, lStuffSize);
-                    lPacket.skip(lStuffSize);
-                    lPacket.data()[4] += lStuffSize;
-
-            } else {
-                // adaptationFieldControl |= 0x20 == MpegTsAdaptationFieldType::payload_adaption_both
-  //              std::cout << "here" << std::endl;
-
-                if (lFirst) {
-                    //we are here since there is no adaption field.. and first is set . That means we got a PES header.
-                    lPacket.data()[3] |= 0x20;
-                    uint8_t* lpBase = lPacket.data() + 4;
-                    size_t pesHeaderSize = lPos - 4;
-                    uint8_t *pesHeader = new uint8_t[pesHeaderSize];
-                    memcpy(pesHeader,lpBase,pesHeaderSize);
-                    memcpy(lpBase+lStuffSize,pesHeader,pesHeaderSize);
-                    delete[] pesHeader;
-
-                    lPacket.data()[4] = lStuffSize - 1;
-                    if (lStuffSize >= 2) {
-                        lPacket.data()[5] = 0;
-                        memset(&(lPacket.data()[6]), 0xff, lStuffSize - 2);
-                    }
-
-                    lPacket.skip(lStuffSize);
-                    lPacket.data()[4] = lStuffSize - 1;
-                    if (lStuffSize >= 2) {
-                        lPacket.data()[5] = 0;
-                        memset(&(lPacket.data()[6]), 0xff, lStuffSize - 2);
-                    }
-
-                } else {
-                    lPacket.data()[3] |= 0x20;
-                    int lDestPosition = 188 - 4 - lStuffSize;
-                    uint8_t *lSrcPosition = lPacket.data() + 4;
-                    int lLength = lPacket.pos() - 4;
-                    lPacket.setData(lDestPosition, lSrcPosition, lLength);
-                    lPacket.skip(lStuffSize);
-                    lPacket.data()[4] = lStuffSize - 1;
-                    if (lStuffSize >= 2) {
-                        lPacket.data()[5] = 0;
-                        memset(&(lPacket.data()[6]), 0xff, lStuffSize - 2);
-                    }
-                }
-            }
-            lPacket.setData(lPacket.pos(), rFrame.mData->data()+rFrame.mData->pos(), lInSize);
-            rFrame.mData->skip(lInSize);
-        }
-
-        rSb.append(lPacket.data(), lPacket.size());
-        lFirst = false;
-    }
-}
-
-// added for remux
-void MpegTsMuxer::createPesRemux(EsFrame &rFrame, SimpleBuffer &rSb) {
-    bool lFirst = true;
+#ifdef REMUX
     uint32_t tsIdx = 0;
+#endif
     while (!rFrame.mData->empty()) {
         SimpleBuffer lPacket;
 
         TsHeader lTsHeader;
         lTsHeader.mPid = rFrame.mPid;
         lTsHeader.mAdaptationFieldControl = MpegTsAdaptationFieldType::mPayloadOnly;
-        lTsHeader.mContinuityCounter = getCc(rFrame.mPid/*rFrame.mStreamType*/);
+#ifdef REMUX
+        lTsHeader.mContinuityCounter = getCc(rFrame.mPid);
+#else
+        lTsHeader.mContinuityCounter = getCc(rFrame.mStreamType);
+#endif
 
+#ifdef REMUX
         auto it = std::find(rFrame.pcrIndexes.begin(), rFrame.pcrIndexes.end(), tsIdx);
-
+#endif
         if (lFirst) {
             lTsHeader.mPayloadUnitStartIndicator = 0x01;
+#ifdef REMUX
         }
 
         if (it != rFrame.pcrIndexes.end()) {
@@ -328,6 +189,19 @@ void MpegTsMuxer::createPesRemux(EsFrame &rFrame, SimpleBuffer &rSb) {
         }
         else if (lFirst) {
             if (rFrame.mRandomAccess) {
+#else
+            if (rFrame.mPid == mPcrPid) {
+                lTsHeader.mAdaptationFieldControl |= 0x02;
+                AdaptationFieldHeader adapt_field_header;
+                adapt_field_header.mAdaptationFieldLength = 0x07;
+                adapt_field_header.mRandomAccessIndicator = rFrame.mRandomAccess;
+                adapt_field_header.mPcrFlag = 0x01;
+
+                lTsHeader.encode(lPacket);
+                adapt_field_header.encode(lPacket);
+                writePcr(lPacket, rFrame.mPcr);
+            } else if (rFrame.mRandomAccess) {
+#endif
                 lTsHeader.mAdaptationFieldControl |= 0x02;
                 AdaptationFieldHeader adapt_field_header;
                 adapt_field_header.mAdaptationFieldLength = 0x01;
@@ -452,9 +326,13 @@ void MpegTsMuxer::createPesRemux(EsFrame &rFrame, SimpleBuffer &rSb) {
 
         rSb.append(lPacket.data(), lPacket.size());
         lFirst = false;
+#ifdef REMUX
         tsIdx ++;
+#endif
     }
+#ifdef REMUX
     rFrame.numTsPackets = tsIdx;
+#endif
 }
 
 void MpegTsMuxer::createPcr(uint64_t lPcr, uint8_t lTag) {
@@ -509,6 +387,7 @@ void MpegTsMuxer::createNull(uint8_t lTag) {
     }
 }
 
+#ifdef REMUX
 // added for remux
 // Function to search for a byte array in a buffer
 int32_t searchByteArray(const unsigned char* buffer, size_t bufferSize, const unsigned char* targetArray, size_t targetSize) {
@@ -541,9 +420,28 @@ void MpegTsMuxer::replaceSps(EsFrame& esFrame, SimpleBuffer &rSb, SimpleBuffer &
     rSb.append(esFrame.mData->data() + pPsByteOffset, esFrame.mData->size() - pPsByteOffset);
     
 }
+#endif
 
 void MpegTsMuxer::encode(EsFrame &rFrame, uint8_t lTag, bool lRandomAccess) {
     std::lock_guard<std::mutex> lock(mMuxMtx);
+
+#ifdef REMUX
+    std::shared_ptr<SimpleBuffer> pTSData = rFrame.mTSData;  // Get the shared_ptr
+
+    if (pTSData) {  // Check if the shared_ptr is valid
+        SimpleBuffer lSb;
+
+        createPes(rFrame, lSb);
+        if (tsOutCallback) {
+            tsOutCallback(lSb, lTag, lRandomAccess);
+        }
+        *pTSData = lSb;
+
+    } else {
+        std::cout << "Error: lSb is not valid" << std::endl;
+        // Handle case where shared_ptr is nullptr
+    }    
+#else
     SimpleBuffer lSb;
 
     if (mMuxType == MpegTsMuxer::MuxType::segmentType && lRandomAccess) {
@@ -560,27 +458,7 @@ void MpegTsMuxer::encode(EsFrame &rFrame, uint8_t lTag, bool lRandomAccess) {
     if (tsOutCallback) {
         tsOutCallback(lSb, lTag, lRandomAccess);
     }
-}
-
-// added for remux
-void MpegTsMuxer::encodeRemux(EsFrame &rFrame, uint8_t lTag, bool lRandomAccess) {
-    std::lock_guard<std::mutex> lock(mMuxMtx);
-
-    std::shared_ptr<SimpleBuffer> pTSData = rFrame.mTSData;  // Get the shared_ptr
-
-    if (pTSData) {  // Check if the shared_ptr is valid
-        SimpleBuffer lSb;
-
-        createPesRemux(rFrame, lSb);
-        if (tsOutCallback) {
-            tsOutCallback(lSb, lTag, lRandomAccess);
-        }
-        *pTSData = lSb;
-
-    } else {
-        std::cout << "Error: lSb is not valid" << std::endl;
-        // Handle case where shared_ptr is nullptr
-    }    
+#endif
 }
 
 uint8_t MpegTsMuxer::getCc(uint32_t lWithPid) {
@@ -593,11 +471,12 @@ uint8_t MpegTsMuxer::getCc(uint32_t lWithPid) {
     return 0;
 }
 
+#ifdef REMUX
 // added for remux
 void MpegTsMuxer::initCc(uint32_t lWithPid, uint8_t uCC) {
     mPidCcMap[lWithPid] = (uCC - 1) & 0x0F;
 }
-
+#endif
 
 bool MpegTsMuxer::shouldCreatePat() {
     bool lRet = false;
