@@ -39,14 +39,13 @@ public:
     bool mCompleted;
     bool mBroken;
 
-#ifdef IMAX_SCT
+    // added for remux
     int32_t videoFrameNumber;
     std::vector<uint32_t> pcrIndexes;
     std::vector<uint64_t> pcrs;  
     uint32_t origNumTsPackets;
     uint32_t numTsPackets;
     std::shared_ptr<SimpleBuffer> mTSData;
-#endif
 };
 
 class TsHeader {
