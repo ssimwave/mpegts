@@ -7,7 +7,7 @@ static const uint16_t MPEGTS_NULL_PACKET_PID = 0x1FFF;
 static const uint16_t MPEGTS_PAT_PID         = 0x0000;
 static const uint32_t MPEGTS_PAT_INTERVAL        = 20;
 
-#ifdef REMUX
+#ifdef IMAX_SCT
 MpegTsMuxer::MpegTsMuxer(std::map<uint8_t, int> lStreamPidMap, uint16_t lPmtPid, uint16_t lPcrPid,  MuxType lType, uint8_t uCc) {
 #else
 MpegTsMuxer::MpegTsMuxer(std::map<uint8_t, int> lStreamPidMap, uint16_t lPmtPid, uint16_t lPcrPid,  MuxType lType) {
@@ -16,7 +16,7 @@ MpegTsMuxer::MpegTsMuxer(std::map<uint8_t, int> lStreamPidMap, uint16_t lPmtPid,
     mStreamPidMap = lStreamPidMap;
     mPcrPid = lPcrPid;
     mMuxType = lType;
-#ifdef REMUX
+#ifdef IMAX_SCT
     // added for remux
     MpegTsMuxer::initCc(lPcrPid, uCc);
 #endif
@@ -126,7 +126,7 @@ void MpegTsMuxer::createPmt(SimpleBuffer &rSb, std::map<uint8_t, int> lStreamPid
 
 void MpegTsMuxer::createPes(EsFrame &rFrame, SimpleBuffer &rSb) {
     bool lFirst = true;
-#ifdef REMUX
+#ifdef IMAX_SCT
     uint32_t tsIdx = 0;
 #endif
     while (!rFrame.mData->empty()) {
@@ -135,18 +135,18 @@ void MpegTsMuxer::createPes(EsFrame &rFrame, SimpleBuffer &rSb) {
         TsHeader lTsHeader;
         lTsHeader.mPid = rFrame.mPid;
         lTsHeader.mAdaptationFieldControl = MpegTsAdaptationFieldType::mPayloadOnly;
-#ifdef REMUX
+#ifdef IMAX_SCT
         lTsHeader.mContinuityCounter = getCc(rFrame.mPid);
 #else
         lTsHeader.mContinuityCounter = getCc(rFrame.mStreamType);
 #endif
 
-#ifdef REMUX
+#ifdef IMAX_SCT
         auto it = std::find(rFrame.pcrIndexes.begin(), rFrame.pcrIndexes.end(), tsIdx);
 #endif
         if (lFirst) {
             lTsHeader.mPayloadUnitStartIndicator = 0x01;
-#ifdef REMUX
+#ifdef IMAX_SCT
         }
 
         if (it != rFrame.pcrIndexes.end()) {
@@ -326,11 +326,11 @@ void MpegTsMuxer::createPes(EsFrame &rFrame, SimpleBuffer &rSb) {
 
         rSb.append(lPacket.data(), lPacket.size());
         lFirst = false;
-#ifdef REMUX
+#ifdef IMAX_SCT
         tsIdx ++;
 #endif
     }
-#ifdef REMUX
+#ifdef IMAX_SCT
     rFrame.numTsPackets = tsIdx;
 #endif
 }
@@ -387,7 +387,7 @@ void MpegTsMuxer::createNull(uint8_t lTag) {
     }
 }
 
-#ifdef REMUX
+#ifdef IMAX_SCT
 // added for remux
 // Function to search for a byte array in a buffer
 int32_t searchByteArray(const unsigned char* buffer, size_t bufferSize, const unsigned char* targetArray, size_t targetSize) {
@@ -425,7 +425,7 @@ void MpegTsMuxer::replaceSps(EsFrame& esFrame, SimpleBuffer &rSb, SimpleBuffer &
 void MpegTsMuxer::encode(EsFrame &rFrame, uint8_t lTag, bool lRandomAccess) {
     std::lock_guard<std::mutex> lock(mMuxMtx);
 
-#ifdef REMUX
+#ifdef IMAX_SCT
     std::shared_ptr<SimpleBuffer> pTSData = rFrame.mTSData;  // Get the shared_ptr
 
     if (pTSData) {  // Check if the shared_ptr is valid
@@ -471,7 +471,7 @@ uint8_t MpegTsMuxer::getCc(uint32_t lWithPid) {
     return 0;
 }
 
-#ifdef REMUX
+#ifdef IMAX_SCT
 // added for remux
 void MpegTsMuxer::initCc(uint32_t lWithPid, uint8_t uCC) {
     mPidCcMap[lWithPid] = (uCC - 1) & 0x0F;

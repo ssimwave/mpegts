@@ -23,7 +23,7 @@ public:
         dvbType //Not implemented at all
     };
 
-#ifdef REMUX
+#ifdef IMAX_SCT
     MpegTsMuxer(std::map<uint8_t, int> lStreamPidMap, uint16_t lPmtPid, uint16_t lPcrPid, MuxType lType, uint8_t initCc=0);
 #else
     MpegTsMuxer(std::map<uint8_t, int> lStreamPidMap, uint16_t lPmtPid, uint16_t lPcrPid, MuxType lType);
@@ -45,14 +45,14 @@ public:
 
     std::function<void(SimpleBuffer &rSb, uint8_t lTag, bool lRandomAccess)> tsOutCallback = nullptr;
 
-#ifdef REMUX
+#ifdef IMAX_SCT
     // added for remux
     void replaceSps(EsFrame& esFrameDst, SimpleBuffer &rSb, SimpleBuffer &rSps);
 #endif
 
 private:
     uint8_t getCc(uint32_t lWithPid);
-#ifdef REMUX
+#ifdef IMAX_SCT
     void initCc(uint32_t lWithPid, uint8_t uCC);
 #endif
 

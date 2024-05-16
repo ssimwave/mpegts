@@ -3,14 +3,14 @@
 
 MpegTsDemuxer::MpegTsDemuxer()
         : mPmtId(0), mPcrId(0) {
-#ifdef REMUX
+#ifdef IMAX_SCT
     videoFrameNumber = 0;
 #endif
 }
 
 MpegTsDemuxer::~MpegTsDemuxer() = default;
 
-#ifdef REMUX
+#ifdef IMAX_SCT
     uint8_t MpegTsDemuxer::decode(SimpleBuffer &rIn, std::vector<TSPacket>& packetVector, std::vector<EsFrame>& esFrameVector) {
 #else
 uint8_t MpegTsDemuxer::decode(SimpleBuffer &rIn) {
@@ -21,7 +21,7 @@ uint8_t MpegTsDemuxer::decode(SimpleBuffer &rIn) {
     }
     while ((rIn.size() - rIn.pos()) >= 188 ) {
         int lPos = rIn.pos();
-#ifdef REMUX
+#ifdef IMAX_SCT
         unsigned char tsData[188];
         bool containsVideoPES = false;
         bool containsPCR = false;
@@ -91,7 +91,7 @@ uint8_t MpegTsDemuxer::decode(SimpleBuffer &rIn) {
             uint8_t lPcrFlag = 0;
             uint64_t lPcr = 0;
             uint8_t lRandomAccessIndicator = 0;
-#ifdef REMUX
+#ifdef IMAX_SCT
             if (mStreamPidMap[TYPE_VIDEO_H264] == lTsHeader.mPid || 
                 mStreamPidMap[TYPE_VIDEO_H265] == lTsHeader.mPid)
                 containsVideoPES = true;
@@ -103,7 +103,7 @@ uint8_t MpegTsDemuxer::decode(SimpleBuffer &rIn) {
                 lRandomAccessIndicator = lAdaptionField.mRandomAccessIndicator;
                 int lAdaptFieldLength = lAdaptionField.mAdaptationFieldLength;
                 if (lAdaptionField.mPcrFlag == 1) {
-#ifdef REMUX
+#ifdef IMAX_SCT
                     containsPCR = true;
                     lPcr = readPcrFull(rIn);
                     lPacketPcr = lPcr;
@@ -134,7 +134,7 @@ uint8_t MpegTsDemuxer::decode(SimpleBuffer &rIn) {
                         if (esOutCallback) {
                             if (lEsFrame.mExpectedPesPacketLength == 0) {
                                 lEsFrame.mCompleted = true;
-#ifdef REMUX
+#ifdef IMAX_SCT
                                 if (containsVideoPES)
                                 {
                                     esFrameVector.emplace_back(lEsFrame);
@@ -183,7 +183,7 @@ uint8_t MpegTsDemuxer::decode(SimpleBuffer &rIn) {
                         if (lEsFrame.mData->size() == payloadLength) {
                             if (esOutCallback) {
                                 lEsFrame.mCompleted = true;
-#ifdef REMUX
+#ifdef IMAX_SCT
                                 if (containsVideoPES)
                                 {
                                     esFrameVector.emplace_back(lEsFrame);
@@ -197,7 +197,7 @@ uint8_t MpegTsDemuxer::decode(SimpleBuffer &rIn) {
                         }
 
                         rIn.skip(188 - (rIn.pos() - lPos));
-#ifdef REMUX
+#ifdef IMAX_SCT
                         packetVector.emplace_back(tsData, containsVideoPES, (containsVideoPES) ? videoFrameNumber : 0, containsPCR, (containsPCR) ? lPacketPcr : 0);
 #endif
                         continue;
@@ -219,7 +219,7 @@ uint8_t MpegTsDemuxer::decode(SimpleBuffer &rIn) {
                 if (lEsFrame.mExpectedPayloadLength == lEsFrame.mData->size()) {
                     if (esOutCallback) {
                         lEsFrame.mCompleted = true;
-#ifdef REMUX
+#ifdef IMAX_SCT
                         if (containsVideoPES)
                         {
                             esFrameVector.emplace_back(lEsFrame);
@@ -237,7 +237,7 @@ uint8_t MpegTsDemuxer::decode(SimpleBuffer &rIn) {
         } else if (mPcrId != 0 && mPcrId == lTsHeader.mPid) {
             AdaptationFieldHeader lAdaptField;
             lAdaptField.decode(rIn);
-#ifdef REMUX
+#ifdef IMAX_SCT
             uint64_t lPcr = readPcrFull(rIn);
 #else
             uint64_t lPcr = readPcr(rIn);
@@ -247,7 +247,7 @@ uint8_t MpegTsDemuxer::decode(SimpleBuffer &rIn) {
             }
         }
         rIn.skip(188 - (rIn.pos() - lPos));
-#ifdef REMUX
+#ifdef IMAX_SCT
         packetVector.emplace_back(tsData, containsVideoPES, (containsVideoPES) ? videoFrameNumber : 0, containsPCR, (containsPCR) ? lPacketPcr : 0);
 #endif
     }

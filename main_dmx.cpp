@@ -85,7 +85,7 @@ void dmxOutput(const EsFrame &esFrame) {
 }
 
 int main(int argc, char *argv[]) {
-#ifndef REMUX
+#ifndef IMAX_SCT
     std::cout << "TS - demuxlib test " << std::endl;
     gDemuxer.esOutCallback = std::bind(&dmxOutput, std::placeholders::_1);
     std::ifstream ifile("bars.ts", std::ios::binary | std::ios::in);

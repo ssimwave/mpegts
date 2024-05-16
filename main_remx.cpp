@@ -22,7 +22,7 @@ MpegTsDemuxer gDemuxer;
 void dmxOutput(const EsFrame &esFrame) {}
 
 int main(int argc, char *argv[]) {
-#ifdef REMUX
+#ifdef IMAX_SCT
     gDemuxer.esOutCallback = std::bind(&dmxOutput, std::placeholders::_1);
 
     std::cout << "Input TS file: " << argv[1] << std::endl;

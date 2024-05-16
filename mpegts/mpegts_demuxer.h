@@ -16,7 +16,7 @@
 #include <mutex>
 #include "common.h"
 
-#ifdef REMUX
+#ifdef IMAX_SCT
 #define TYPE_VIDEO_H264 0x1b
 //H.265 video
 #define TYPE_VIDEO_H265 0x24
@@ -43,7 +43,7 @@ public:
 
     virtual ~MpegTsDemuxer();
 
-#ifdef REMUX
+#ifdef IMAX_SCT
     uint8_t decode(SimpleBuffer &rIn, std::vector<TSPacket>& packetVector, std::vector<EsFrame>& esFrameVector);
 #else
     uint8_t decode(SimpleBuffer &rIn);
@@ -53,7 +53,7 @@ public:
     std::function<void(uint64_t lPcr)> pcrOutCallback = nullptr;
     std::function<void(const std::string&)> streamInfoCallback = nullptr;
 
-#ifdef REMUX
+#ifdef IMAX_SCT
     // added for remux
     // Function to get EsFrame for a given PID
     EsFrame* getH264Frame() {
@@ -79,7 +79,7 @@ public:
     PMTHeader mPmtHeader;
     bool mPmtIsValid = false;
 
-#ifdef REMUX
+#ifdef IMAX_SCT
     // added for remux
     int32_t videoFrameNumber;
 #endif
