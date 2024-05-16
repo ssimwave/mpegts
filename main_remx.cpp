@@ -25,6 +25,11 @@ int main(int argc, char *argv[]) {
 #ifdef IMAX_SCT
     gDemuxer.esOutCallback = std::bind(&dmxOutput, std::placeholders::_1);
 
+    if (argc != 5) {
+        std::cerr << "Usage: " << argv[0] << " <input_file> <output_file> <initial_continuity_counter> <sps_file>" << std::endl;
+        return EXIT_FAILURE;
+    }
+    
     std::cout << "Input TS file: " << argv[1] << std::endl;
     std::cout << "Output TS file: " << argv[2] << std::endl;
     std::cout << "Video PID starting CC: " << argv[3] << std::endl;
