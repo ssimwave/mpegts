@@ -81,7 +81,7 @@ public:
 
 #ifdef IMAX_SCT
     // added for remux
-    int32_t videoFrameNumber;
+    int32_t videoFrameNumber{0};
 #endif
 
 private:

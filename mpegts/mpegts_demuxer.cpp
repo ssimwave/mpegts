@@ -3,9 +3,6 @@
 
 MpegTsDemuxer::MpegTsDemuxer()
         : mPmtId(0), mPcrId(0) {
-#ifdef IMAX_SCT
-    videoFrameNumber = 0;
-#endif
 }
 
 MpegTsDemuxer::~MpegTsDemuxer() = default;
@@ -92,9 +89,10 @@ uint8_t MpegTsDemuxer::decode(SimpleBuffer &rIn) {
             uint64_t lPcr = 0;
             uint8_t lRandomAccessIndicator = 0;
 #ifdef IMAX_SCT
-            if (mStreamPidMap[TYPE_VIDEO_H264] == lTsHeader.mPid || 
-                mStreamPidMap[TYPE_VIDEO_H265] == lTsHeader.mPid)
+            if (mStreamPidMap[TYPE_VIDEO_H264] == lTsHeader.mPid ||
+                mStreamPidMap[TYPE_VIDEO_H265] == lTsHeader.mPid) {
                 containsVideoPES = true;
+            }
 #endif
             if (lTsHeader.mAdaptationFieldControl == MpegTsAdaptationFieldType::mAdaptionOnly ||
                 lTsHeader.mAdaptationFieldControl == MpegTsAdaptationFieldType::mPayloadAdaptionBoth) {

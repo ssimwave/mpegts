@@ -60,7 +60,7 @@ uint64_t readPcr(SimpleBuffer &rSb) {
     return lPcr;
 }
 
-// added for remux
+#ifdef IMAX_SCT
 
 void writePcrFull(SimpleBuffer &rSb, uint64_t lPcr) {
     // write the full 48 bit PCR
@@ -75,24 +75,26 @@ void writePcrFull(SimpleBuffer &rSb, uint64_t lPcr) {
 uint64_t readPcrFull(SimpleBuffer &rSb) {
     uint64_t lPcr = 0;
     uint64_t lVal;
-    
-    lVal = rSb.read1Byte();
-    lPcr |= (lVal << 40) & 0xFF0000000000;
 
     lVal = rSb.read1Byte();
-    lPcr |= (lVal << 32) & 0xFF00000000;
+    lPcr |= (lVal & 0xFF) << 40;
 
     lVal = rSb.read1Byte();
-    lPcr |= (lVal << 24) & 0xFF000000;
+    lPcr |= (lVal & 0xFF) << 32;
 
     lVal = rSb.read1Byte();
-    lPcr |= (lVal << 16) & 0xFF0000;
+    lPcr |= (lVal & 0xFF) << 24;
 
     lVal = rSb.read1Byte();
-    lPcr |= ((lVal << 8) & 0xFF00);
+    lPcr |= (lVal & 0xFF) << 16;
 
     lVal = rSb.read1Byte();
-    lPcr |= ((lVal << 0) & 0x00FF);
+    lPcr |= (lVal & 0xFF) << 8;
+
+    lVal = rSb.read1Byte();
+    lPcr |= (lVal & 0xFF);
 
     return lPcr;
 }
+
+#endif
