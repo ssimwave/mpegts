@@ -8,7 +8,7 @@ MpegTsDemuxer::MpegTsDemuxer()
 MpegTsDemuxer::~MpegTsDemuxer() = default;
 
 #ifdef IMAX_SCT
-    uint8_t MpegTsDemuxer::decode(SimpleBuffer &rIn, std::vector<TSPacket>& packetVector, std::vector<EsFrame>& esFrameVector) {
+uint8_t MpegTsDemuxer::decode(SimpleBuffer &rIn, std::vector<TSPacket>& packetVector, std::vector<EsFrame>& esFrameVector) {
 #else
 uint8_t MpegTsDemuxer::decode(SimpleBuffer &rIn) {
 #endif
@@ -246,7 +246,15 @@ uint8_t MpegTsDemuxer::decode(SimpleBuffer &rIn) {
         }
         rIn.skip(188 - (rIn.pos() - lPos));
 #ifdef IMAX_SCT
-        packetVector.emplace_back(tsData, containsVideoPES, (containsVideoPES) ? videoFrameNumber : 0, containsPCR, (containsPCR) ? lPacketPcr : 0);
+        if (containsVideoPES) {
+            EsFrame& lEsFrame = mEsFrames[lTsHeader.mPid];
+            if (lEsFrame.mData->size() != 0) {
+                packetVector.emplace_back(tsData, containsVideoPES, (containsVideoPES) ? videoFrameNumber : 0, containsPCR, (containsPCR) ? lPacketPcr : 0);
+            }
+        }
+        else {
+            packetVector.emplace_back(tsData, containsVideoPES, (containsVideoPES) ? videoFrameNumber : 0, containsPCR, (containsPCR) ? lPacketPcr : 0);
+        }
 #endif
     }
 

@@ -17,7 +17,6 @@ MpegTsMuxer::MpegTsMuxer(std::map<uint8_t, int> lStreamPidMap, uint16_t lPmtPid,
     mPcrPid = lPcrPid;
     mMuxType = lType;
 #ifdef IMAX_SCT
-    // added for remux
     MpegTsMuxer::initCc(lPcrPid, uCc);
 #endif
 }
@@ -156,6 +155,9 @@ void MpegTsMuxer::createPes(EsFrame &rFrame, SimpleBuffer &rSb) {
             AdaptationFieldHeader adapt_field_header;
             adapt_field_header.mAdaptationFieldLength = 0x07;
             adapt_field_header.mRandomAccessIndicator = rFrame.mRandomAccess;
+            if (lFirst) {
+                adapt_field_header.mDiscontinuityIndicator = 1;
+            }
             adapt_field_header.mPcrFlag = 0x01;
 
             lTsHeader.encode(lPacket);
@@ -206,6 +208,9 @@ void MpegTsMuxer::createPes(EsFrame &rFrame, SimpleBuffer &rSb) {
                 AdaptationFieldHeader adapt_field_header;
                 adapt_field_header.mAdaptationFieldLength = 0x01;
                 adapt_field_header.mRandomAccessIndicator = rFrame.mRandomAccess;
+                if (lFirst) {
+                    adapt_field_header.mDiscontinuityIndicator = 1;
+                }
 
                 lTsHeader.encode(lPacket);
                 adapt_field_header.encode(lPacket);
@@ -388,7 +393,6 @@ void MpegTsMuxer::createNull(uint8_t lTag) {
 }
 
 #ifdef IMAX_SCT
-// added for remux
 // Function to search for a byte array in a buffer
 int32_t searchByteArray(const unsigned char* buffer, size_t bufferSize, const unsigned char* targetArray, size_t targetSize) {
     for (size_t i = 0; i <= bufferSize - targetSize; ++i) {
@@ -399,13 +403,16 @@ int32_t searchByteArray(const unsigned char* buffer, size_t bufferSize, const un
     return -1; // Return nullptr if not found
 }
 
-// added for remux
 void MpegTsMuxer::replaceSps(EsFrame& esFrame, SimpleBuffer &rSb, SimpleBuffer &rSps) {
 
     uint8_t *frameBuffer = esFrame.mData->data();
+#ifdef HEVC
+    unsigned char sps[] = { 0x00, 0x00, 0x00, 0x01, 0x42 }; // SPS: 0x0000000142
+    unsigned char pps[] = { 0x00, 0x00, 0x00, 0x01, 0x44 }; // PPS: 0x0000000144
+#else
     unsigned char sps[] = { 0x00, 0x00, 0x00, 0x01, 0x27 }; // SPS: 0x0000000127
     unsigned char pps[] = { 0x00, 0x00, 0x00, 0x01, 0x28 }; // PPS: 0x0000000128
-
+#endif
     int32_t sPsByteOffset;
     int32_t pPsByteOffset;
 
@@ -472,7 +479,6 @@ uint8_t MpegTsMuxer::getCc(uint32_t lWithPid) {
 }
 
 #ifdef IMAX_SCT
-// added for remux
 void MpegTsMuxer::initCc(uint32_t lWithPid, uint8_t uCC) {
     mPidCcMap[lWithPid] = (uCC - 1) & 0x0F;
 }

@@ -32,7 +32,6 @@ int main(int argc, char *argv[]) {
 
     std::ifstream ifile(argv[1], std::ios::binary | std::ios::in);
     std::ifstream ifile2(argv[4], std::ios::binary | std::ios::in);
-    std::ofstream oVFile(argv[2], std::ofstream::binary | std::ofstream::out);
 
     uint8_t packet[188] = {0};
     SimpleBuffer in;
@@ -42,14 +41,21 @@ int main(int argc, char *argv[]) {
 
     int count = 0;
 
+#ifdef HEVC
+    int streamType = TYPE_VIDEO_H265;  
+#else
+    int streamType = TYPE_VIDEO_H264;  
+#endif
+
     while (!ifile.eof()) {
         ifile.read((char*)&packet[0], 188);
         // write out the last ES frame
         if (ifile.gcount() != 188) {
-            EsFrame *esFrame = gDemuxer.getH264Frame();
-
-            esFrameVector.emplace_back(*esFrame);
-            dmxOutput(*esFrame);
+            EsFrame *esFrame = gDemuxer.getEsFrame(streamType);
+            if (esFrame->mData->size() != 0) {
+                esFrameVector.emplace_back(*esFrame);
+                dmxOutput(*esFrame);
+            }
             break;
         }        
         in.append(packet, 188);
@@ -57,7 +63,7 @@ int main(int argc, char *argv[]) {
         count ++;
     }
     ifile.close();
-    std::cout << "Total number of video frames: " << gDemuxer.videoFrameNumber << std::endl;
+    std::cout << "Size of esFrameVector: " << esFrameVector.size() << std::endl;
 
     SimpleBuffer sps;
     while (!ifile2.eof()) {
@@ -109,9 +115,15 @@ int main(int argc, char *argv[]) {
     MpegTsMuxer *gpMuxer;
     std::map<uint8_t, int> gStreamPidMap;
     gStreamPidMap[TYPE_AUDIO] = gDemuxer.mStreamPidMap[TYPE_AUDIO];
+#ifdef HEVC
+    gStreamPidMap[TYPE_VIDEO_H265] = gDemuxer.mStreamPidMap[TYPE_VIDEO_H265];
+    std::cout << "Video PID " << gDemuxer.mStreamPidMap[TYPE_VIDEO_H265] << std::endl;
+    gpMuxer = new MpegTsMuxer(gStreamPidMap, PMT_PID, gStreamPidMap[TYPE_VIDEO_H265], MpegTsMuxer::MuxType::h222Type, std::stoi(argv[3]));
+#else
     gStreamPidMap[TYPE_VIDEO_H264] = gDemuxer.mStreamPidMap[TYPE_VIDEO_H264];
     std::cout << "Video PID " << gDemuxer.mStreamPidMap[TYPE_VIDEO_H264] << std::endl;
     gpMuxer = new MpegTsMuxer(gStreamPidMap, PMT_PID, gStreamPidMap[TYPE_VIDEO_H264], MpegTsMuxer::MuxType::h222Type, std::stoi(argv[3]));
+#endif    
     gpMuxer->tsOutCallback = nullptr;
 
     videoFrameNumber = 0;
@@ -138,6 +150,7 @@ int main(int argc, char *argv[]) {
 
     int32_t prevVideoFrameNumber = 0;
     uint32_t tsIdx = 0;
+    std::ofstream oVFile(argv[2], std::ofstream::binary | std::ofstream::out);
 
     // write out the remuxed TS
     // for the video TS packets, write the remuxed TS packets

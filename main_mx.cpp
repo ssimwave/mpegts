@@ -252,7 +252,7 @@ void fakeVideoEncoder() {
 
 int main(int argc, char *argv[]) {
     std::cout << "TS - muxlib test " << std::endl;
-#ifndef REMUX
+#ifndef IMAX_SCT
     std::map<uint8_t, int> gStreamPidMap;
     gStreamPidMap[TYPE_AUDIO] = AUDIO_PID;
     gStreamPidMap[TYPE_VIDEO] = VIDEO_PID;

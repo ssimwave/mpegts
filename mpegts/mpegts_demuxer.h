@@ -21,7 +21,6 @@
 //H.265 video
 #define TYPE_VIDEO_H265 0x24
 
-// added for remux
 class TSPacket {
 public:
     unsigned char tsPacket[188];  // Actual TS packet data 
@@ -54,11 +53,10 @@ public:
     std::function<void(const std::string&)> streamInfoCallback = nullptr;
 
 #ifdef IMAX_SCT
-    // added for remux
     // Function to get EsFrame for a given PID
-    EsFrame* getH264Frame() {
+    EsFrame* getEsFrame(uint32_t streamType) {
 
-        int pid = mStreamPidMap[TYPE_VIDEO_H264];
+        int pid = mStreamPidMap[streamType];
         auto it = mEsFrames.find(pid);
         if (it != mEsFrames.end()) {
             return &(it->second);  // Return a pointer to the found EsFrame
@@ -80,7 +78,6 @@ public:
     bool mPmtIsValid = false;
 
 #ifdef IMAX_SCT
-    // added for remux
     int32_t videoFrameNumber{0};
 #endif
 

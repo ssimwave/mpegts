@@ -46,7 +46,6 @@ public:
     std::function<void(SimpleBuffer &rSb, uint8_t lTag, bool lRandomAccess)> tsOutCallback = nullptr;
 
 #ifdef IMAX_SCT
-    // added for remux
     void replaceSps(EsFrame& esFrameDst, SimpleBuffer &rSb, SimpleBuffer &rSps);
 #endif
 
