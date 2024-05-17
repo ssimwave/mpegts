@@ -419,12 +419,24 @@ void MpegTsMuxer::replaceSps(EsFrame& esFrame, SimpleBuffer &rSb, SimpleBuffer &
     sPsByteOffset = searchByteArray(frameBuffer,  esFrame.mData->size(), sps, sizeof(sps));
     pPsByteOffset = searchByteArray(frameBuffer,  esFrame.mData->size(), pps, sizeof(pps));
 
+    if (sPsByteOffset == -1) {
+        std::cout << "SPS not found. No SPS replacement." << std::endl;
+        rSb.append(esFrame.mData->data(), esFrame.mData->size());
+        return;
+    }
+    if (pPsByteOffset == -1) {
+        std::cout << "PPS not found. No SPS replacement." << std::endl;
+        rSb.append(esFrame.mData->data(), esFrame.mData->size());
+        return;
+    }
+
     // append the bytes prior to the SPS
     rSb.append(esFrame.mData->data(), sPsByteOffset);
     // append the SPS
     rSb.append(rSps.data(), rSps.size());
     // append the remaining bytes
     rSb.append(esFrame.mData->data() + pPsByteOffset, esFrame.mData->size() - pPsByteOffset);
+    std::cout << "SPS replaced successfully." << std::endl;
     
 }
 #endif
