@@ -16,6 +16,7 @@ find_package (Threads REQUIRED)
 
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG")
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DIMAX_SCT")
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/mpegts/)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/unit_tests/)
@@ -28,9 +29,6 @@ target_link_libraries(mpeg_ts_dmx_tests mpegts Threads::Threads)
 
 add_executable(mpeg_ts_mx_tests ${CMAKE_CURRENT_SOURCE_DIR}/main_mx.cpp)
 target_link_libraries(mpeg_ts_mx_tests mpegts Threads::Threads)
-
-add_executable(mpeg_ts_remx_tests ${CMAKE_CURRENT_SOURCE_DIR}/main_remx.cpp)
-target_link_libraries(mpeg_ts_remx_tests mpegts Threads::Threads)
 
 file(GLOB unit_tests_sources ${CMAKE_CURRENT_SOURCE_DIR}/unit_tests/*.cpp)
 add_executable(mpeg_ts_unit_tests ${unit_tests_sources} ${CMAKE_CURRENT_SOURCE_DIR}/unit_tests.cpp)
