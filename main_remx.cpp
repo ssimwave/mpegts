@@ -100,7 +100,6 @@ int main(int argc, char *argv[]) {
         }
         sPsFile.close();
     }
-    ifile2.close();
 
     // lookback mode
     if (std::stoi(mode) == 0) {
