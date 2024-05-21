@@ -47,6 +47,7 @@ public:
 
 #ifdef IMAX_SCT
     void replaceSps(EsFrame& esFrameDst, SimpleBuffer &rSb, SimpleBuffer &rSps);
+    void extractSps(EsFrame& esFrameSrc, SimpleBuffer &rSps);
 #endif
 
 private:

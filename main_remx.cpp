@@ -41,13 +41,18 @@ int main(int argc, char *argv[]) {
     std::cout << "Video PID starting CC: " << initial_cc << std::endl;
     std::cout << "SPS file: " << sps_file << std::endl;
 
-    // mode: 0, 1, 2
+    // mode: 0, 1, 2, 3
     // mode 0: loopback, no change made to the packet
     // mode 1: remux only, no sps replacement
-    // mode 2: full functionality with sps replacement
+    // mode 2: remux with sps replacement
+    // mode 3: sps extraction only
 
     std::ifstream ifile(input_file, std::ios::binary | std::ios::in);
-    std::ifstream ifile2(sps_file, std::ios::binary | std::ios::in);
+    std::ifstream sPsFile;
+
+    if (std::stoi(mode) == 2) {
+        sPsFile.open(sps_file, std::ios::binary | std::ios::in);
+    }
 
     uint8_t packet[188] = {0};
     SimpleBuffer in;
@@ -83,13 +88,17 @@ int main(int argc, char *argv[]) {
     std::cout << "Size of esFrameVector: " << esFrameVector.size() << std::endl;
 
     SimpleBuffer sps;
-    while (!ifile2.eof()) {
-        ifile2.read((char*)&packet[0], 188);
-        if (ifile2.gcount() != 188) {
-            sps.append(packet, ifile2.gcount());
-            break; 
+
+    if (std::stoi(mode) == 2) {
+        while (!sPsFile.eof()) {
+            sPsFile.read((char*)&packet[0], 188);
+            if (sPsFile.gcount() != 188) {
+                sps.append(packet, sPsFile.gcount());
+                break; 
+            }
+            sps.append(packet, 188);
         }
-        sps.append(packet, 188);
+        sPsFile.close();
     }
     ifile2.close();
 
@@ -151,9 +160,17 @@ int main(int argc, char *argv[]) {
     for (auto& esFrame : esFrameVector) {
         esFrame.videoFrameNumber = videoFrameNumber;
 
+        // search and extract SPS
+        // assuming that the SPS is in the first access unit
+        if (std::stoi(mode) == 3 && videoFrameNumber == 0) {
+            SimpleBuffer lSb;
+            gpMuxer->extractSps(esFrame, sps);
+            break;
+        }        
+
         // search and replace SPS
         // assuming that the SPS is only in the first access unit
-        if (std::stoi(mode) > 1 && videoFrameNumber == 0) {
+        if (std::stoi(mode) == 2 && videoFrameNumber == 0) {
             SimpleBuffer lSb;
             gpMuxer->replaceSps(esFrame, lSb, sps);
             *esFrame.mData = lSb;
@@ -168,6 +185,14 @@ int main(int argc, char *argv[]) {
         oVFile2.write((const char *)esFrame.mData->data(), esFrame.mData->size());
     oVFile2.close();
 #endif
+
+    if (std::stoi(mode) == 3) {
+        std::ofstream sPsFile(sps_file, std::ofstream::binary | std::ofstream::out);
+        sPsFile.write((const char *)sps.data(), sps.size());
+        sPsFile.close();
+
+        return EXIT_SUCCESS;
+    }
 
     int32_t prevVideoFrameNumber = 0;
     uint32_t tsIdx = 0;
