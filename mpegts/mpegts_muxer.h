@@ -46,8 +46,8 @@ public:
     std::function<void(SimpleBuffer &rSb, uint8_t lTag, bool lRandomAccess)> tsOutCallback = nullptr;
 
 #ifdef IMAX_SCT
-    void replaceSps(EsFrame& esFrameDst, SimpleBuffer &rSb, SimpleBuffer &rSps);
-    void extractSps(EsFrame& esFrameSrc, SimpleBuffer &rSps);
+    void replaceSps(EsFrame& esFrameDst, SimpleBuffer &rSb, SimpleBuffer &rSps, std::string codec);
+    void extractSps(EsFrame& esFrameSrc, SimpleBuffer &rSps, std::string codec);
 #endif
 
 private:
