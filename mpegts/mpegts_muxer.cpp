@@ -403,28 +403,20 @@ int32_t searchByteArray(const unsigned char* buffer, size_t bufferSize, const un
     return -1; // Return nullptr if not found
 }
 
-void MpegTsMuxer::replaceSps(EsFrame& esFrame, SimpleBuffer &rSb, SimpleBuffer &rSps, std::string codec) {
+void MpegTsMuxer::replaceSps(EsFrame& esFrame,
+                             SimpleBuffer &rSb,
+                             SimpleBuffer &rSps,
+                             unsigned char *sps
+                             size_t spsSize,
+                             unsigned char *pps
+                             size_t ppsSize) {
 
     uint8_t *frameBuffer = esFrame.mData->data();
-    unsigned char sps_hevc[] = { 0x00, 0x00, 0x00, 0x01, 0x42 }; // SPS: 0x0000000142
-    unsigned char pps_hevc[] = { 0x00, 0x00, 0x00, 0x01, 0x44 }; // PPS: 0x0000000144
-    unsigned char sps_avc[] = { 0x00, 0x00, 0x00, 0x01, 0x27 }; // SPS: 0x0000000127
-    unsigned char pps_avc[] = { 0x00, 0x00, 0x00, 0x01, 0x28 }; // PPS: 0x0000000128
     int32_t sPsByteOffset;
     int32_t pPsByteOffset;
-
-    if (std::to_lower(codec) == "hevc") {
-        sPsByteOffset = searchByteArray(frameBuffer,  esFrame.mData->size(), sps_hevc, sizeof(sps_hevc));
-        pPsByteOffset = searchByteArray(frameBuffer,  esFrame.mData->size(), pps_hevc, sizeof(pps_hevc));
-    }
-    else if (std::to_lower(codec) == "avc") {
-        sPsByteOffset = searchByteArray(frameBuffer,  esFrame.mData->size(), sps_avc, sizeof(sps_avc));
-        pPsByteOffset = searchByteArray(frameBuffer,  esFrame.mData->size(), pps_avc, sizeof(pps_avc));
-    }
-    else {
-        std::cout << "Codec: " << codec << " is not supported." << std::endl;
-        return;
-    }
+{
+    sPsByteOffset = searchByteArray(frameBuffer,  esFrame.mData->size(), sps, spsSize);
+    pPsByteOffset = searchByteArray(frameBuffer,  esFrame.mData->size(), pps, ppsSize);
 
     if (sPsByteOffset == -1) {
         std::cout << "SPS not found. No SPS replacement." << std::endl;
@@ -444,33 +436,25 @@ void MpegTsMuxer::replaceSps(EsFrame& esFrame, SimpleBuffer &rSb, SimpleBuffer &
     // append the remaining bytes
     rSb.append(esFrame.mData->data() + pPsByteOffset, esFrame.mData->size() - pPsByteOffset);
     std::cout << "SPS replaced successfully." << std::endl;
-    
+
 }
 
-void MpegTsMuxer::extractSps(EsFrame& esFrame, SimpleBuffer &rSps, std::string codec) {
+void MpegTsMuxer::extractSps(EsFrame& esFrame,
+                             SimpleBuffer &rSps,
+                             std::string codec,
+                             unsigned char *sps
+                             size_t spsSize,
+                             unsigned char *pps
+                             size_t ppsSize) {
 
     uint8_t *frameBuffer = esFrame.mData->data();
 
-    unsigned char sps_hevc[] = { 0x00, 0x00, 0x00, 0x01, 0x42 }; // SPS: 0x0000000142
-    unsigned char pps_hevc[] = { 0x00, 0x00, 0x00, 0x01, 0x44 }; // PPS: 0x0000000144
-    unsigned char sps_avc[] = { 0x00, 0x00, 0x00, 0x01, 0x27 }; // SPS: 0x0000000127
-    unsigned char pps_avc[] = { 0x00, 0x00, 0x00, 0x01, 0x28 }; // PPS: 0x0000000128
     int32_t sPsByteOffset;
     int32_t pPsByteOffset;
     int32_t sPsSize = 0;
 
-    if (codec == "HEVC") {
-        sPsByteOffset = searchByteArray(frameBuffer,  esFrame.mData->size(), sps_hevc, sizeof(sps_hevc));
-        pPsByteOffset = searchByteArray(frameBuffer,  esFrame.mData->size(), pps_hevc, sizeof(pps_hevc));
-    }
-    else if (codec == "AVC") {
-        sPsByteOffset = searchByteArray(frameBuffer,  esFrame.mData->size(), sps_avc, sizeof(sps_avc));
-        pPsByteOffset = searchByteArray(frameBuffer,  esFrame.mData->size(), pps_avc, sizeof(pps_avc));
-    }
-    else {
-        std::cout << "Codec: " << codec << " is not supported." << std::endl;
-        return;
-    }
+    sPsByteOffset = searchByteArray(frameBuffer,  esFrame.mData->size(), sps, spsSize);
+    pPsByteOffset = searchByteArray(frameBuffer,  esFrame.mData->size(), pps, ppsSize);
 
     if (sPsByteOffset == -1) {
         std::cout << "SPS not found. Failed to extract SPS." << std::endl;
@@ -485,7 +469,6 @@ void MpegTsMuxer::extractSps(EsFrame& esFrame, SimpleBuffer &rSps, std::string c
     // append the SPS
     rSps.append(esFrame.mData->data() + sPsByteOffset, sPsSize);
     std::cout << "SPS extracted successfully, " << rSps.size() << " bytes" << std::endl;
-    
 }
 
 #endif
