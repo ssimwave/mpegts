@@ -408,7 +408,7 @@ void MpegTsMuxer::replaceSps(EsFrame& esFrame,
                              SimpleBuffer &rSps,
                              unsigned char *sps,
                              size_t spsSize,
-                             unsigned char *pps
+                             unsigned char *pps,
                              size_t ppsSize) {
 
     uint8_t *frameBuffer = esFrame.mData->data();
@@ -443,7 +443,7 @@ void MpegTsMuxer::extractSps(EsFrame& esFrame,
                              SimpleBuffer &rSps,
                              unsigned char *sps,
                              size_t spsSize,
-                             unsigned char *pps
+                             unsigned char *pps,
                              size_t ppsSize) {
 
     uint8_t *frameBuffer = esFrame.mData->data();
