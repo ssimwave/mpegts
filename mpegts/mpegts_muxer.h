@@ -55,7 +55,6 @@ public:
                     size_t ppsSize);
     void extractSps(EsFrame& esFrameSrc,
                     SimpleBuffer &rSps,
-                    std::string codec,
                     unsigned char* sps,
                     size_t spsSize,
                     unsigned char* pps,
