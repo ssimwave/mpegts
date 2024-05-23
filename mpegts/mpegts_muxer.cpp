@@ -441,7 +441,6 @@ void MpegTsMuxer::replaceSps(EsFrame& esFrame,
 
 void MpegTsMuxer::extractSps(EsFrame& esFrame,
                              SimpleBuffer &rSps,
-                             std::string codec,
                              unsigned char *sps
                              size_t spsSize,
                              unsigned char *pps
