@@ -406,7 +406,7 @@ int32_t searchByteArray(const unsigned char* buffer, size_t bufferSize, const un
 void MpegTsMuxer::replaceSps(EsFrame& esFrame,
                              SimpleBuffer &rSb,
                              SimpleBuffer &rSps,
-                             unsigned char *sps
+                             unsigned char *sps,
                              size_t spsSize,
                              unsigned char *pps
                              size_t ppsSize) {
@@ -441,7 +441,7 @@ void MpegTsMuxer::replaceSps(EsFrame& esFrame,
 
 void MpegTsMuxer::extractSps(EsFrame& esFrame,
                              SimpleBuffer &rSps,
-                             unsigned char *sps
+                             unsigned char *sps,
                              size_t spsSize,
                              unsigned char *pps
                              size_t ppsSize) {
