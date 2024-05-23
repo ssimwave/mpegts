@@ -412,11 +412,8 @@ void MpegTsMuxer::replaceSps(EsFrame& esFrame,
                              size_t ppsSize) {
 
     uint8_t *frameBuffer = esFrame.mData->data();
-    int32_t sPsByteOffset;
-    int32_t pPsByteOffset;
-{
-    sPsByteOffset = searchByteArray(frameBuffer,  esFrame.mData->size(), sps, spsSize);
-    pPsByteOffset = searchByteArray(frameBuffer,  esFrame.mData->size(), pps, ppsSize);
+    int32_t sPsByteOffset = searchByteArray(frameBuffer,  esFrame.mData->size(), sps, spsSize);
+    int32_t pPsByteOffset = searchByteArray(frameBuffer,  esFrame.mData->size(), pps, ppsSize);
 
     if (sPsByteOffset == -1) {
         std::cout << "SPS not found. No SPS replacement." << std::endl;
@@ -448,12 +445,9 @@ void MpegTsMuxer::extractSps(EsFrame& esFrame,
 
     uint8_t *frameBuffer = esFrame.mData->data();
 
-    int32_t sPsByteOffset;
-    int32_t pPsByteOffset;
-    int32_t sPsSize = 0;
-
-    sPsByteOffset = searchByteArray(frameBuffer,  esFrame.mData->size(), sps, spsSize);
-    pPsByteOffset = searchByteArray(frameBuffer,  esFrame.mData->size(), pps, ppsSize);
+    int32_t sPsByteOffset = searchByteArray(frameBuffer,  esFrame.mData->size(), sps, spsSize);
+    int32_t pPsByteOffset = searchByteArray(frameBuffer,  esFrame.mData->size(), pps, ppsSize);
+    int32_t actualSPSSize = 0;
 
     if (sPsByteOffset == -1) {
         std::cout << "SPS not found. Failed to extract SPS." << std::endl;
@@ -463,10 +457,10 @@ void MpegTsMuxer::extractSps(EsFrame& esFrame,
         std::cout << "PPS not found. Failed to extract SPS." << std::endl;
         return;
     }
-    sPsSize = pPsByteOffset - sPsByteOffset;
+    actualSPSSize = pPsByteOffset - sPsByteOffset;
 
     // append the SPS
-    rSps.append(esFrame.mData->data() + sPsByteOffset, sPsSize);
+    rSps.append(esFrame.mData->data() + sPsByteOffset, actualSPSSize);
     std::cout << "SPS extracted successfully, " << rSps.size() << " bytes" << std::endl;
 }
 
