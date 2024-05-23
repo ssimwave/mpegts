@@ -413,11 +413,11 @@ void MpegTsMuxer::replaceSps(EsFrame& esFrame, SimpleBuffer &rSb, SimpleBuffer &
     int32_t sPsByteOffset;
     int32_t pPsByteOffset;
 
-    if (codec == "HEVC") {
+    if (std::to_lower(codec) == "hevc") {
         sPsByteOffset = searchByteArray(frameBuffer,  esFrame.mData->size(), sps_hevc, sizeof(sps_hevc));
         pPsByteOffset = searchByteArray(frameBuffer,  esFrame.mData->size(), pps_hevc, sizeof(pps_hevc));
     }
-    else if (codec == "AVC") {
+    else if (std::to_lower(codec) == "avc") {
         sPsByteOffset = searchByteArray(frameBuffer,  esFrame.mData->size(), sps_avc, sizeof(sps_avc));
         pPsByteOffset = searchByteArray(frameBuffer,  esFrame.mData->size(), pps_avc, sizeof(pps_avc));
     }
