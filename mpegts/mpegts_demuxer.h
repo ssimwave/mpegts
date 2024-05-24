@@ -14,18 +14,56 @@
 #include <map>
 #include <functional>
 #include <mutex>
+#include "common.h"
 
+#ifdef IMAX_SCT
+#define TYPE_VIDEO_H264 0x1b
+//H.265 video
+#define TYPE_VIDEO_H265 0x24
+
+class TSPacket {
+public:
+    unsigned char tsPacket[188];  // Actual TS packet data 
+    bool containsVideoPES;       // Indicator if packet contains video PES
+    int pesFrameNumber;          // PES frame number
+    bool containsPCR;            // Indicator if packet contains PCR
+    uint64_t pcrValue;          // PCR value
+
+    // Constructor to initialize member variables
+    TSPacket(const unsigned char* packet, bool hasVideoPES, int frameNum, bool hasPCR, uint64_t pcr)
+        : containsVideoPES(hasVideoPES), pesFrameNumber(frameNum), containsPCR(hasPCR), pcrValue(pcr) {
+        std::copy(packet, packet + 188, tsPacket);  // Copy TS packet data
+    }
+};
+#endif
 class MpegTsDemuxer {
 public:
     MpegTsDemuxer();
 
     virtual ~MpegTsDemuxer();
 
+#ifdef IMAX_SCT
+    uint8_t decode(SimpleBuffer &rIn, std::vector<TSPacket>& packetVector, std::vector<EsFrame>& esFrameVector);
+#else
     uint8_t decode(SimpleBuffer &rIn);
+#endif
 
     std::function<void(const EsFrame& pEs)> esOutCallback = nullptr;
     std::function<void(uint64_t lPcr)> pcrOutCallback = nullptr;
     std::function<void(const std::string&)> streamInfoCallback = nullptr;
+
+#ifdef IMAX_SCT
+    // Function to get EsFrame for a given PID
+    EsFrame* getEsFrame(uint32_t streamType) {
+
+        int pid = mStreamPidMap[streamType];
+        auto it = mEsFrames.find(pid);
+        if (it != mEsFrames.end()) {
+            return &(it->second);  // Return a pointer to the found EsFrame
+        }
+        return nullptr;  // Return nullptr if EsFrame not found for the given PID
+    }
+#endif
 
     // stream, pid
     std::map<uint8_t, int> mStreamPidMap;
@@ -38,6 +76,10 @@ public:
     // PMT
     PMTHeader mPmtHeader;
     bool mPmtIsValid = false;
+
+#ifdef IMAX_SCT
+    int32_t videoFrameNumber{0};
+#endif
 
 private:
     // pid, Elementary data frame

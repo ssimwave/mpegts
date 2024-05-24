@@ -7,11 +7,18 @@ static const uint16_t MPEGTS_NULL_PACKET_PID = 0x1FFF;
 static const uint16_t MPEGTS_PAT_PID         = 0x0000;
 static const uint32_t MPEGTS_PAT_INTERVAL        = 20;
 
+#ifdef IMAX_SCT
+MpegTsMuxer::MpegTsMuxer(std::map<uint8_t, int> lStreamPidMap, uint16_t lPmtPid, uint16_t lPcrPid,  MuxType lType, uint8_t uCc) {
+#else
 MpegTsMuxer::MpegTsMuxer(std::map<uint8_t, int> lStreamPidMap, uint16_t lPmtPid, uint16_t lPcrPid,  MuxType lType) {
+#endif
     mPmtPid = lPmtPid;
     mStreamPidMap = lStreamPidMap;
     mPcrPid = lPcrPid;
     mMuxType = lType;
+#ifdef IMAX_SCT
+    MpegTsMuxer::initCc(lPcrPid, uCc);
+#endif
 }
 
 MpegTsMuxer::~MpegTsMuxer() {
@@ -118,16 +125,73 @@ void MpegTsMuxer::createPmt(SimpleBuffer &rSb, std::map<uint8_t, int> lStreamPid
 
 void MpegTsMuxer::createPes(EsFrame &rFrame, SimpleBuffer &rSb) {
     bool lFirst = true;
+#ifdef IMAX_SCT
+    uint32_t tsIdx = 0;
+#endif
     while (!rFrame.mData->empty()) {
         SimpleBuffer lPacket;
 
         TsHeader lTsHeader;
         lTsHeader.mPid = rFrame.mPid;
         lTsHeader.mAdaptationFieldControl = MpegTsAdaptationFieldType::mPayloadOnly;
+#ifdef IMAX_SCT
+        lTsHeader.mContinuityCounter = getCc(rFrame.mPid);
+#else
         lTsHeader.mContinuityCounter = getCc(rFrame.mStreamType);
+#endif
 
+#ifdef IMAX_SCT
+        auto it = std::find(rFrame.pcrIndexes.begin(), rFrame.pcrIndexes.end(), tsIdx);
+#endif
         if (lFirst) {
             lTsHeader.mPayloadUnitStartIndicator = 0x01;
+#ifdef IMAX_SCT
+        }
+
+        if (it != rFrame.pcrIndexes.end()) {
+            size_t position = std::distance(rFrame.pcrIndexes.begin(), it);
+
+            lTsHeader.mAdaptationFieldControl |= 0x02;
+            AdaptationFieldHeader adapt_field_header;
+            adapt_field_header.mAdaptationFieldLength = 0x07;
+            adapt_field_header.mRandomAccessIndicator = rFrame.mRandomAccess;
+            if (lFirst) {
+                adapt_field_header.mDiscontinuityIndicator = 1;
+            }
+            adapt_field_header.mPcrFlag = 0x01;
+
+            lTsHeader.encode(lPacket);
+            adapt_field_header.encode(lPacket);
+            writePcrFull(lPacket, rFrame.pcrs[position]/*rFrame.mPcr*/);
+
+            PESHeader lPesHeader;
+            lPesHeader.mPacketStartCode = 0x000001;
+            lPesHeader.mStreamId = rFrame.mStreamId;
+            lPesHeader.mMarkerBits = 0x02;
+            lPesHeader.mOriginalOrCopy = 0x01;
+
+            if (rFrame.mPts != rFrame.mDts) {
+                lPesHeader.mPtsDtsFlags = 0x03;
+                lPesHeader.mHeaderDataLength = 0x0A;
+            } else {
+                lPesHeader.mPtsDtsFlags = 0x2;
+                lPesHeader.mHeaderDataLength = 0x05;
+            }
+
+            uint32_t lPesSize = (lPesHeader.mHeaderDataLength + rFrame.mData->size() + 3);
+            lPesHeader.mPesPacketLength = lPesSize > 0xffff ? 0 : lPesSize;
+            lPesHeader.encode(lPacket);
+
+            if (lPesHeader.mPtsDtsFlags == 0x03) {
+                writePts(lPacket, 3, rFrame.mPts);
+                writePts(lPacket, 1, rFrame.mDts);
+            } else {
+                writePts(lPacket, 2, rFrame.mPts);
+            }
+        }
+        else if (lFirst) {
+            if (rFrame.mRandomAccess) {
+#else
             if (rFrame.mPid == mPcrPid) {
                 lTsHeader.mAdaptationFieldControl |= 0x02;
                 AdaptationFieldHeader adapt_field_header;
@@ -139,10 +203,14 @@ void MpegTsMuxer::createPes(EsFrame &rFrame, SimpleBuffer &rSb) {
                 adapt_field_header.encode(lPacket);
                 writePcr(lPacket, rFrame.mPcr);
             } else if (rFrame.mRandomAccess) {
+#endif
                 lTsHeader.mAdaptationFieldControl |= 0x02;
                 AdaptationFieldHeader adapt_field_header;
                 adapt_field_header.mAdaptationFieldLength = 0x01;
                 adapt_field_header.mRandomAccessIndicator = rFrame.mRandomAccess;
+                if (lFirst) {
+                    adapt_field_header.mDiscontinuityIndicator = 1;
+                }
 
                 lTsHeader.encode(lPacket);
                 adapt_field_header.encode(lPacket);
@@ -219,7 +287,6 @@ void MpegTsMuxer::createPes(EsFrame &rFrame, SimpleBuffer &rSb) {
 
             } else {
                 // adaptationFieldControl |= 0x20 == MpegTsAdaptationFieldType::payload_adaption_both
-  //              std::cout << "here" << std::endl;
 
                 if (lFirst) {
                     //we are here since there is no adaption field.. and first is set . That means we got a PES header.
@@ -264,7 +331,13 @@ void MpegTsMuxer::createPes(EsFrame &rFrame, SimpleBuffer &rSb) {
 
         rSb.append(lPacket.data(), lPacket.size());
         lFirst = false;
+#ifdef IMAX_SCT
+        tsIdx ++;
+#endif
     }
+#ifdef IMAX_SCT
+    rFrame.numTsPackets = tsIdx;
+#endif
 }
 
 void MpegTsMuxer::createPcr(uint64_t lPcr, uint8_t lTag) {
@@ -319,8 +392,100 @@ void MpegTsMuxer::createNull(uint8_t lTag) {
     }
 }
 
+#ifdef IMAX_SCT
+// Function to search for a byte array in a buffer
+int32_t searchByteArray(const unsigned char* buffer, size_t bufferSize, const unsigned char* targetArray, size_t targetSize) {
+    for (size_t i = 0; i <= bufferSize - targetSize; ++i) {
+        if (std::memcmp(buffer + i, targetArray, targetSize) == 0) {
+            return i; // Return a pointer to the found position
+        }
+    }
+    return -1; // Return nullptr if not found
+}
+
+void MpegTsMuxer::replaceSps(EsFrame& esFrame,
+                             SimpleBuffer &rSb,
+                             SimpleBuffer &rSps,
+                             unsigned char *sps,
+                             size_t spsSize,
+                             unsigned char *pps,
+                             size_t ppsSize) {
+
+    uint8_t *frameBuffer = esFrame.mData->data();
+    int32_t sPsByteOffset = searchByteArray(frameBuffer,  esFrame.mData->size(), sps, spsSize);
+    int32_t pPsByteOffset = searchByteArray(frameBuffer,  esFrame.mData->size(), pps, ppsSize);
+
+    if (sPsByteOffset == -1) {
+        std::cout << "SPS not found. No SPS replacement." << std::endl;
+        rSb.append(esFrame.mData->data(), esFrame.mData->size());
+        return;
+    }
+    if (pPsByteOffset == -1) {
+        std::cout << "PPS not found. No SPS replacement." << std::endl;
+        rSb.append(esFrame.mData->data(), esFrame.mData->size());
+        return;
+    }
+
+    // append the bytes prior to the SPS
+    rSb.append(esFrame.mData->data(), sPsByteOffset);
+    // append the SPS
+    rSb.append(rSps.data(), rSps.size());
+    // append the remaining bytes
+    rSb.append(esFrame.mData->data() + pPsByteOffset, esFrame.mData->size() - pPsByteOffset);
+    std::cout << "SPS replaced successfully." << std::endl;
+
+}
+
+void MpegTsMuxer::extractSps(EsFrame& esFrame,
+                             SimpleBuffer &rSps,
+                             unsigned char *sps,
+                             size_t spsSize,
+                             unsigned char *pps,
+                             size_t ppsSize) {
+
+    uint8_t *frameBuffer = esFrame.mData->data();
+
+    int32_t sPsByteOffset = searchByteArray(frameBuffer,  esFrame.mData->size(), sps, spsSize);
+    int32_t pPsByteOffset = searchByteArray(frameBuffer,  esFrame.mData->size(), pps, ppsSize);
+    int32_t actualSPSSize = 0;
+
+    if (sPsByteOffset == -1) {
+        std::cout << "SPS not found. Failed to extract SPS." << std::endl;
+        return;
+    }
+    if (pPsByteOffset == -1) {
+        std::cout << "PPS not found. Failed to extract SPS." << std::endl;
+        return;
+    }
+    actualSPSSize = pPsByteOffset - sPsByteOffset;
+
+    // append the SPS
+    rSps.append(esFrame.mData->data() + sPsByteOffset, actualSPSSize);
+    std::cout << "SPS extracted successfully, " << rSps.size() << " bytes" << std::endl;
+}
+
+#endif
+
 void MpegTsMuxer::encode(EsFrame &rFrame, uint8_t lTag, bool lRandomAccess) {
     std::lock_guard<std::mutex> lock(mMuxMtx);
+
+#ifdef IMAX_SCT
+    std::shared_ptr<SimpleBuffer> pTSData = rFrame.mTSData;  // Get the shared_ptr
+
+    if (pTSData) {  // Check if the shared_ptr is valid
+        SimpleBuffer lSb;
+
+        createPes(rFrame, lSb);
+        if (tsOutCallback) {
+            tsOutCallback(lSb, lTag, lRandomAccess);
+        }
+        *pTSData = lSb;
+
+    } else {
+        std::cout << "Error: lSb is not valid" << std::endl;
+        // Handle case where shared_ptr is nullptr
+    }    
+#else
     SimpleBuffer lSb;
 
     if (mMuxType == MpegTsMuxer::MuxType::segmentType && lRandomAccess) {
@@ -337,6 +502,7 @@ void MpegTsMuxer::encode(EsFrame &rFrame, uint8_t lTag, bool lRandomAccess) {
     if (tsOutCallback) {
         tsOutCallback(lSb, lTag, lRandomAccess);
     }
+#endif
 }
 
 uint8_t MpegTsMuxer::getCc(uint32_t lWithPid) {
@@ -348,6 +514,12 @@ uint8_t MpegTsMuxer::getCc(uint32_t lWithPid) {
     mPidCcMap[lWithPid] = 0;
     return 0;
 }
+
+#ifdef IMAX_SCT
+void MpegTsMuxer::initCc(uint32_t lWithPid, uint8_t uCC) {
+    mPidCcMap[lWithPid] = (uCC - 1) & 0x0F;
+}
+#endif
 
 bool MpegTsMuxer::shouldCreatePat() {
     bool lRet = false;

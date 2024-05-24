@@ -3,18 +3,31 @@
 
 MpegTsDemuxer::MpegTsDemuxer()
         : mPmtId(0), mPcrId(0) {
-
 }
 
 MpegTsDemuxer::~MpegTsDemuxer() = default;
 
+#ifdef IMAX_SCT
+uint8_t MpegTsDemuxer::decode(SimpleBuffer &rIn, std::vector<TSPacket>& packetVector, std::vector<EsFrame>& esFrameVector) {
+#else
 uint8_t MpegTsDemuxer::decode(SimpleBuffer &rIn) {
+#endif
     if (mRestData.size()) {
         rIn.prepend(mRestData.data(),mRestData.size());
         mRestData.clear();
     }
     while ((rIn.size() - rIn.pos()) >= 188 ) {
         int lPos = rIn.pos();
+#ifdef IMAX_SCT
+        unsigned char tsData[188];
+        bool containsVideoPES = false;
+        bool containsPCR = false;
+        uint64_t lPacketPcr;
+        bool frameCompleted = false;
+
+        // Copy data from rIn.data()[lPos] to tsData
+        std::copy(rIn.data() + lPos, rIn.data() + lPos + 188, std::begin(tsData));
+#endif
         TsHeader lTsHeader;
         lTsHeader.decode(rIn);
 
@@ -75,6 +88,12 @@ uint8_t MpegTsDemuxer::decode(SimpleBuffer &rIn) {
             uint8_t lPcrFlag = 0;
             uint64_t lPcr = 0;
             uint8_t lRandomAccessIndicator = 0;
+#ifdef IMAX_SCT
+            if (mStreamPidMap[TYPE_VIDEO_H264] == lTsHeader.mPid ||
+                mStreamPidMap[TYPE_VIDEO_H265] == lTsHeader.mPid) {
+                containsVideoPES = true;
+            }
+#endif
             if (lTsHeader.mAdaptationFieldControl == MpegTsAdaptationFieldType::mAdaptionOnly ||
                 lTsHeader.mAdaptationFieldControl == MpegTsAdaptationFieldType::mPayloadAdaptionBoth) {
                 AdaptationFieldHeader lAdaptionField;
@@ -82,8 +101,13 @@ uint8_t MpegTsDemuxer::decode(SimpleBuffer &rIn) {
                 lRandomAccessIndicator = lAdaptionField.mRandomAccessIndicator;
                 int lAdaptFieldLength = lAdaptionField.mAdaptationFieldLength;
                 if (lAdaptionField.mPcrFlag == 1) {
+#ifdef IMAX_SCT
+                    containsPCR = true;
+                    lPcr = readPcrFull(rIn);
+                    lPacketPcr = lPcr;
+#else
                     lPcr = readPcr(rIn);
-
+#endif
                     if (pcrOutCallback) {
                         pcrOutCallback(lPcr);
                     }
@@ -108,6 +132,14 @@ uint8_t MpegTsDemuxer::decode(SimpleBuffer &rIn) {
                         if (esOutCallback) {
                             if (lEsFrame.mExpectedPesPacketLength == 0) {
                                 lEsFrame.mCompleted = true;
+#ifdef IMAX_SCT
+                                if (containsVideoPES)
+                                {
+                                    esFrameVector.emplace_back(lEsFrame);
+                                    frameCompleted = true;
+                                    videoFrameNumber += 1;
+                                }
+#endif
                             } else {
                                 // Expected length is set, but we didn't get enough data, deliver what we have as broken
                                 lEsFrame.mBroken = true;
@@ -149,12 +181,23 @@ uint8_t MpegTsDemuxer::decode(SimpleBuffer &rIn) {
                         if (lEsFrame.mData->size() == payloadLength) {
                             if (esOutCallback) {
                                 lEsFrame.mCompleted = true;
+#ifdef IMAX_SCT
+                                if (containsVideoPES)
+                                {
+                                    esFrameVector.emplace_back(lEsFrame);
+                                    frameCompleted = true;
+                                    videoFrameNumber += 1;
+                                }
+#endif
                                 esOutCallback(lEsFrame);
                             }
                             lEsFrame.reset();
                         }
 
                         rIn.skip(188 - (rIn.pos() - lPos));
+#ifdef IMAX_SCT
+                        packetVector.emplace_back(tsData, containsVideoPES, (containsVideoPES) ? videoFrameNumber : 0, containsPCR, (containsPCR) ? lPacketPcr : 0);
+#endif
                         continue;
                     }
                 }
@@ -174,6 +217,15 @@ uint8_t MpegTsDemuxer::decode(SimpleBuffer &rIn) {
                 if (lEsFrame.mExpectedPayloadLength == lEsFrame.mData->size()) {
                     if (esOutCallback) {
                         lEsFrame.mCompleted = true;
+#ifdef IMAX_SCT
+                        if (containsVideoPES)
+                        {
+                            esFrameVector.emplace_back(lEsFrame);
+                            frameCompleted = true;
+                            //std::cout << "1 videoFrameNumber += 1" << std::endl;
+                            videoFrameNumber += 1;
+                        }
+#endif
                         esOutCallback(lEsFrame);
                     }
                     lEsFrame.reset();
@@ -183,12 +235,27 @@ uint8_t MpegTsDemuxer::decode(SimpleBuffer &rIn) {
         } else if (mPcrId != 0 && mPcrId == lTsHeader.mPid) {
             AdaptationFieldHeader lAdaptField;
             lAdaptField.decode(rIn);
+#ifdef IMAX_SCT
+            uint64_t lPcr = readPcrFull(rIn);
+#else
             uint64_t lPcr = readPcr(rIn);
+#endif
             if (pcrOutCallback) {
                 pcrOutCallback(lPcr);
             }
         }
         rIn.skip(188 - (rIn.pos() - lPos));
+#ifdef IMAX_SCT
+        if (containsVideoPES) {
+            EsFrame& lEsFrame = mEsFrames[lTsHeader.mPid];
+            if (lEsFrame.mData->size() != 0) {
+                packetVector.emplace_back(tsData, containsVideoPES, (containsVideoPES) ? videoFrameNumber : 0, containsPCR, (containsPCR) ? lPacketPcr : 0);
+            }
+        }
+        else {
+            packetVector.emplace_back(tsData, containsVideoPES, (containsVideoPES) ? videoFrameNumber : 0, containsPCR, (containsPCR) ? lPacketPcr : 0);
+        }
+#endif
     }
 
     if (rIn.size()-rIn.pos()) {

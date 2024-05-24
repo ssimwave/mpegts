@@ -16,6 +16,7 @@ find_package (Threads REQUIRED)
 
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG")
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DIMAX_SCT")
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/mpegts/)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/unit_tests/)

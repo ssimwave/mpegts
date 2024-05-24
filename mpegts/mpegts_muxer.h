@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <functional>
 #include <mutex>
+#include "common.h"
 
 class MpegTsMuxer {
 public:
@@ -22,7 +23,11 @@ public:
         dvbType //Not implemented at all
     };
 
+#ifdef IMAX_SCT
+    MpegTsMuxer(std::map<uint8_t, int> lStreamPidMap, uint16_t lPmtPid, uint16_t lPcrPid, MuxType lType, uint8_t initCc=0);
+#else
     MpegTsMuxer(std::map<uint8_t, int> lStreamPidMap, uint16_t lPmtPid, uint16_t lPcrPid, MuxType lType);
+#endif
 
     virtual ~MpegTsMuxer();
 
@@ -40,9 +45,27 @@ public:
 
     std::function<void(SimpleBuffer &rSb, uint8_t lTag, bool lRandomAccess)> tsOutCallback = nullptr;
 
+#ifdef IMAX_SCT
+    void replaceSps(EsFrame& esFrameDst,
+                    SimpleBuffer &rSb,
+                    SimpleBuffer &rSps,
+                    unsigned char* sps,
+                    size_t spsSize,
+                    unsigned char* pps,
+                    size_t ppsSize);
+    void extractSps(EsFrame& esFrameSrc,
+                    SimpleBuffer &rSps,
+                    unsigned char* sps,
+                    size_t spsSize,
+                    unsigned char* pps,
+                    size_t ppsSize);
+#endif
 
 private:
     uint8_t getCc(uint32_t lWithPid);
+#ifdef IMAX_SCT
+    void initCc(uint32_t lWithPid, uint8_t uCC);
+#endif
 
     uint32_t mCurrentIndex = 0;
     bool shouldCreatePat();

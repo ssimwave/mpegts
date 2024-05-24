@@ -59,3 +59,42 @@ uint64_t readPcr(SimpleBuffer &rSb) {
 
     return lPcr;
 }
+
+#ifdef IMAX_SCT
+
+void writePcrFull(SimpleBuffer &rSb, uint64_t lPcr) {
+    // write the full 48 bit PCR
+    rSb.write1Byte((int8_t) (lPcr >> 40));
+    rSb.write1Byte((int8_t) (lPcr >> 32));
+    rSb.write1Byte((int8_t) (lPcr >> 24));
+    rSb.write1Byte((int8_t) (lPcr >> 16));
+    rSb.write1Byte((int8_t) (lPcr >>  8));
+    rSb.write1Byte((int8_t) (lPcr >>  0));
+}
+
+uint64_t readPcrFull(SimpleBuffer &rSb) {
+    uint64_t lPcr = 0;
+    uint64_t lVal;
+
+    lVal = rSb.read1Byte();
+    lPcr |= (lVal & 0xFF) << 40;
+
+    lVal = rSb.read1Byte();
+    lPcr |= (lVal & 0xFF) << 32;
+
+    lVal = rSb.read1Byte();
+    lPcr |= (lVal & 0xFF) << 24;
+
+    lVal = rSb.read1Byte();
+    lPcr |= (lVal & 0xFF) << 16;
+
+    lVal = rSb.read1Byte();
+    lPcr |= (lVal & 0xFF) << 8;
+
+    lVal = rSb.read1Byte();
+    lPcr |= (lVal & 0xFF);
+
+    return lPcr;
+}
+
+#endif
