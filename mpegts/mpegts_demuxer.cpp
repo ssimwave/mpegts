@@ -196,7 +196,12 @@ uint8_t MpegTsDemuxer::decode(SimpleBuffer &rIn) {
 
                         rIn.skip(188 - (rIn.pos() - lPos));
 #ifdef IMAX_SCT
-                        packetVector.emplace_back(tsData, containsVideoPES, (containsVideoPES) ? videoFrameNumber : 0, containsPCR, (containsPCR) ? lPacketPcr : 0);
+                        if (frameCompleted) {
+                            packetVector.emplace_back(tsData, containsVideoPES, (containsVideoPES) ? videoFrameNumber - 1 : 0, containsPCR, (containsPCR) ? lPacketPcr : 0);
+                        }
+                        else {
+                            packetVector.emplace_back(tsData, containsVideoPES, (containsVideoPES) ? videoFrameNumber : 0, containsPCR, (containsPCR) ? lPacketPcr : 0);
+                        }
 #endif
                         continue;
                     }
@@ -249,11 +254,19 @@ uint8_t MpegTsDemuxer::decode(SimpleBuffer &rIn) {
         if (containsVideoPES) {
             EsFrame& lEsFrame = mEsFrames[lTsHeader.mPid];
             if (lEsFrame.mData->size() != 0) {
-                packetVector.emplace_back(tsData, containsVideoPES, (containsVideoPES) ? videoFrameNumber : 0, containsPCR, (containsPCR) ? lPacketPcr : 0);
+                if (frameCompleted) {
+                    packetVector.emplace_back(tsData, containsVideoPES, (containsVideoPES) ? videoFrameNumber - 1 : 0, containsPCR, (containsPCR) ? lPacketPcr : 0);
+                } else {
+                    packetVector.emplace_back(tsData, containsVideoPES, (containsVideoPES) ? videoFrameNumber : 0, containsPCR, (containsPCR) ? lPacketPcr : 0);
+                }
             }
         }
         else {
-            packetVector.emplace_back(tsData, containsVideoPES, (containsVideoPES) ? videoFrameNumber : 0, containsPCR, (containsPCR) ? lPacketPcr : 0);
+            if (frameCompleted) {
+                packetVector.emplace_back(tsData, containsVideoPES, (containsVideoPES) ? videoFrameNumber - 1 : 0, containsPCR, (containsPCR) ? lPacketPcr : 0);
+            } else {
+              packetVector.emplace_back(tsData, containsVideoPES, (containsVideoPES) ? videoFrameNumber : 0, containsPCR, (containsPCR) ? lPacketPcr : 0);
+            }
         }
 #endif
     }
