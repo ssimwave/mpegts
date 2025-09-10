@@ -255,17 +255,17 @@ uint8_t MpegTsDemuxer::decode(SimpleBuffer &rIn) {
             EsFrame& lEsFrame = mEsFrames[lTsHeader.mPid];
             if (lEsFrame.mData->size() != 0) {
                 if (frameCompleted) {
-                    packetVector.emplace_back(tsData, containsVideoPES, (containsVideoPES) ? videoFrameNumber - 1 : 0, containsPCR, (containsPCR) ? lPacketPcr : 0);
+                    packetVector.emplace_back(tsData, true, videoFrameNumber - 1, containsPCR, (containsPCR) ? lPacketPcr : 0);
                 } else {
-                    packetVector.emplace_back(tsData, containsVideoPES, (containsVideoPES) ? videoFrameNumber : 0, containsPCR, (containsPCR) ? lPacketPcr : 0);
+                    packetVector.emplace_back(tsData, true, videoFrameNumber, containsPCR, (containsPCR) ? lPacketPcr : 0);
                 }
             }
         }
         else {
             if (frameCompleted) {
-                packetVector.emplace_back(tsData, containsVideoPES, (containsVideoPES) ? videoFrameNumber - 1 : 0, containsPCR, (containsPCR) ? lPacketPcr : 0);
+                packetVector.emplace_back(tsData, false, 0, containsPCR, (containsPCR) ? lPacketPcr : 0);
             } else {
-              packetVector.emplace_back(tsData, containsVideoPES, (containsVideoPES) ? videoFrameNumber : 0, containsPCR, (containsPCR) ? lPacketPcr : 0);
+              packetVector.emplace_back(tsData, false, 0, containsPCR, (containsPCR) ? lPacketPcr : 0);
             }
         }
 #endif
