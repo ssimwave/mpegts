@@ -1,5 +1,30 @@
+
+#include <iostream>
+#include <string>
 #include "mpegts_demuxer.h"
 #include "common.h"
+
+// Helper function for logging with format string and variadic arguments
+#include <cstdarg>
+
+//#define DEBUG_LOG 1
+#include <vector>
+
+#ifdef IMAX_SCT
+namespace {
+    void debugLog(const char* fmt, ...) {
+#ifdef DEBUG_LOG
+        constexpr size_t BUF_SIZE = 1024;
+        char buf[BUF_SIZE];
+        va_list args;
+        va_start(args, fmt);
+        vsnprintf(buf, BUF_SIZE, fmt, args);
+        va_end(args);
+        std::cout << buf << std::endl;
+#endif  // DEBUG_LOG
+    }
+}
+#endif  // IMAX_SCT
 
 MpegTsDemuxer::MpegTsDemuxer()
         : mPmtId(0), mPcrId(0) {
@@ -23,7 +48,6 @@ uint8_t MpegTsDemuxer::decode(SimpleBuffer &rIn) {
         bool containsVideoPES = false;
         bool containsPCR = false;
         uint64_t lPacketPcr;
-        bool frameCompleted = false;
 
         // Copy data from rIn.data()[lPos] to tsData
         std::copy(rIn.data() + lPos, rIn.data() + lPos + 188, std::begin(tsData));
@@ -105,6 +129,7 @@ uint8_t MpegTsDemuxer::decode(SimpleBuffer &rIn) {
                     containsPCR = true;
                     lPcr = readPcrFull(rIn);
                     lPacketPcr = lPcr;
+                    debugLog("Found PCR %llu for PID: %u, current videoFrameNumber: %d", lPcr, lTsHeader.mPid, videoFrameNumber);
 #else
                     lPcr = readPcr(rIn);
 #endif
@@ -128,15 +153,16 @@ uint8_t MpegTsDemuxer::decode(SimpleBuffer &rIn) {
                     // function to the demuxer API that the user can call once it has ran out of input data.
 
                     if (!lEsFrame.mData->empty()) {
-                        // We have an old packet with data, flush and reset it before starting a new one
+                        // We have an old packet with data, flush and reset it before starting a new one.
                         if (esOutCallback) {
                             if (lEsFrame.mExpectedPesPacketLength == 0) {
                                 lEsFrame.mCompleted = true;
 #ifdef IMAX_SCT
+                                // Data from this ES frame has already been appened to packetVector.
                                 if (containsVideoPES)
                                 {
                                     esFrameVector.emplace_back(lEsFrame);
-                                    frameCompleted = true;
+                                    debugLog("PUSI set, Flushing old ES frame for PID: %u, current videoFrameNumber: %d", lTsHeader.mPid, videoFrameNumber);
                                     videoFrameNumber += 1;
                                 }
 #endif
@@ -185,22 +211,29 @@ uint8_t MpegTsDemuxer::decode(SimpleBuffer &rIn) {
                                 if (containsVideoPES)
                                 {
                                     esFrameVector.emplace_back(lEsFrame);
-                                    frameCompleted = true;
-                                    videoFrameNumber += 1;
                                 }
 #endif
                                 esOutCallback(lEsFrame);
                             }
+#ifndef IMAX_SCT
                             lEsFrame.reset();
+#endif
                         }
 
                         rIn.skip(188 - (rIn.pos() - lPos));
 #ifdef IMAX_SCT
-                        if (frameCompleted) {
-                            packetVector.emplace_back(tsData, containsVideoPES, (containsVideoPES) ? videoFrameNumber - 1 : 0, containsPCR, (containsPCR) ? lPacketPcr : 0);
+
+                        if (containsVideoPES) {
+                            debugLog("Adding PES packet for PID: %u PCR: %s Frame number: %d", lTsHeader.mPid, (containsPCR ? std::to_string(lPacketPcr).c_str() : "N/A"), videoFrameNumber);
+                        } else {
+                            debugLog("Adding packet for PID: %u PCR: %s Frame number: %d", lTsHeader.mPid, (containsPCR ? std::to_string(lPacketPcr).c_str() : "N/A"), videoFrameNumber);
                         }
-                        else {
-                            packetVector.emplace_back(tsData, containsVideoPES, (containsVideoPES) ? videoFrameNumber : 0, containsPCR, (containsPCR) ? lPacketPcr : 0);
+
+                        packetVector.emplace_back(tsData, containsVideoPES, (containsVideoPES) ? videoFrameNumber : 0, containsPCR, (containsPCR) ? lPacketPcr : 0);
+                        if (lEsFrame.mData->size() == payloadLength && containsVideoPES && lEsFrame.mCompleted) {
+                            debugLog("Finished frame for PID: %u, PCR: %s, current videoFrameNumber: %d", lTsHeader.mPid, (containsPCR ? std::to_string(lPacketPcr).c_str() : "N/A"), videoFrameNumber);
+                            lEsFrame.reset();
+                            videoFrameNumber += 1;
                         }
 #endif
                         continue;
@@ -226,8 +259,8 @@ uint8_t MpegTsDemuxer::decode(SimpleBuffer &rIn) {
                         if (containsVideoPES)
                         {
                             esFrameVector.emplace_back(lEsFrame);
-                            frameCompleted = true;
-                            //std::cout << "1 videoFrameNumber += 1" << std::endl;
+                            debugLog("Enough data to deliver for PID: %u, PCR: %s, current videoFrameNumber: %d", lTsHeader.mPid, (containsPCR ? std::to_string(lPacketPcr).c_str() : "N/A"), videoFrameNumber);
+                            packetVector.emplace_back(tsData, true, videoFrameNumber, containsPCR, (containsPCR) ? lPacketPcr : 0);
                             videoFrameNumber += 1;
                         }
 #endif
@@ -242,6 +275,10 @@ uint8_t MpegTsDemuxer::decode(SimpleBuffer &rIn) {
             lAdaptField.decode(rIn);
 #ifdef IMAX_SCT
             uint64_t lPcr = readPcrFull(rIn);
+            containsPCR = true;
+            lPcr = readPcrFull(rIn);
+            lPacketPcr = lPcr;
+            debugLog("Found PCR %llu for PID: %u, current videoFrameNumber: %d", lPcr, lTsHeader.mPid, videoFrameNumber);
 #else
             uint64_t lPcr = readPcr(rIn);
 #endif
@@ -254,19 +291,13 @@ uint8_t MpegTsDemuxer::decode(SimpleBuffer &rIn) {
         if (containsVideoPES) {
             EsFrame& lEsFrame = mEsFrames[lTsHeader.mPid];
             if (lEsFrame.mData->size() != 0) {
-                if (frameCompleted) {
-                    packetVector.emplace_back(tsData, true, videoFrameNumber - 1, containsPCR, (containsPCR) ? lPacketPcr : 0);
-                } else {
-                    packetVector.emplace_back(tsData, true, videoFrameNumber, containsPCR, (containsPCR) ? lPacketPcr : 0);
-                }
+                debugLog("Adding PES packet for PID: %u PCR: %s Frame number: %d", lTsHeader.mPid, (containsPCR ? std::to_string(lPacketPcr).c_str() : "N/A"), videoFrameNumber);
+                packetVector.emplace_back(tsData, true, videoFrameNumber, containsPCR, (containsPCR) ? lPacketPcr : 0);
             }
         }
         else {
-            if (frameCompleted) {
-                packetVector.emplace_back(tsData, false, 0, containsPCR, (containsPCR) ? lPacketPcr : 0);
-            } else {
-              packetVector.emplace_back(tsData, false, 0, containsPCR, (containsPCR) ? lPacketPcr : 0);
-            }
+            debugLog("Adding packet for PID: %u PCR: %s Frame number: %d", lTsHeader.mPid, (containsPCR ? std::to_string(lPacketPcr).c_str() : "N/A"), videoFrameNumber);
+            packetVector.emplace_back(tsData, false, 0, containsPCR, (containsPCR) ? lPacketPcr : 0);
         }
 #endif
     }
