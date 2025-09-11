@@ -198,8 +198,7 @@ uint8_t MpegTsDemuxer::decode(SimpleBuffer &rIn) {
 #ifdef IMAX_SCT
                         if (frameCompleted) {
                             packetVector.emplace_back(tsData, containsVideoPES, (containsVideoPES) ? videoFrameNumber - 1 : 0, containsPCR, (containsPCR) ? lPacketPcr : 0);
-                        }
-                        else {
+                        } else {
                             packetVector.emplace_back(tsData, containsVideoPES, (containsVideoPES) ? videoFrameNumber : 0, containsPCR, (containsPCR) ? lPacketPcr : 0);
                         }
 #endif
@@ -227,7 +226,6 @@ uint8_t MpegTsDemuxer::decode(SimpleBuffer &rIn) {
                         {
                             esFrameVector.emplace_back(lEsFrame);
                             frameCompleted = true;
-                            //std::cout << "1 videoFrameNumber += 1" << std::endl;
                             videoFrameNumber += 1;
                         }
 #endif
@@ -254,18 +252,14 @@ uint8_t MpegTsDemuxer::decode(SimpleBuffer &rIn) {
         if (containsVideoPES) {
             EsFrame& lEsFrame = mEsFrames[lTsHeader.mPid];
             if (lEsFrame.mData->size() != 0) {
-                if (frameCompleted) {
-                    packetVector.emplace_back(tsData, true, videoFrameNumber - 1, containsPCR, (containsPCR) ? lPacketPcr : 0);
-                } else {
-                    packetVector.emplace_back(tsData, true, videoFrameNumber, containsPCR, (containsPCR) ? lPacketPcr : 0);
-                }
+                packetVector.emplace_back(tsData, true, videoFrameNumber, containsPCR, (containsPCR) ? lPacketPcr : 0);
             }
         }
         else {
             if (frameCompleted) {
                 packetVector.emplace_back(tsData, false, 0, containsPCR, (containsPCR) ? lPacketPcr : 0);
             } else {
-              packetVector.emplace_back(tsData, false, 0, containsPCR, (containsPCR) ? lPacketPcr : 0);
+                packetVector.emplace_back(tsData, false, 0, containsPCR, (containsPCR) ? lPacketPcr : 0);
             }
         }
 #endif
