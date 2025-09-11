@@ -202,7 +202,7 @@ uint8_t MpegTsDemuxer::decode(SimpleBuffer &rIn) {
                             std::cout << "Packet Added - 1: " << videoFrameNumber - 1 << std::endl;
                             packetVector.emplace_back(tsData, containsVideoPES, (containsVideoPES) ? videoFrameNumber - 1 : 0, containsPCR, (containsPCR) ? lPacketPcr : 0);
                         } else {
-                            std::cout << "Packet Added - 2: " << currentFrameNumber << std::endl;
+                            std::cout << "Packet Added - 2: " << videoFrameNumber << std::endl;
                             packetVector.emplace_back(tsData, containsVideoPES, (containsVideoPES) ? videoFrameNumber : 0, containsPCR, (containsPCR) ? lPacketPcr : 0);
                         }
 #endif
