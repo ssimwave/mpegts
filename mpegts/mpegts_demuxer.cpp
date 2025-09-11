@@ -257,18 +257,19 @@ uint8_t MpegTsDemuxer::decode(SimpleBuffer &rIn) {
         if (containsVideoPES) {
             EsFrame& lEsFrame = mEsFrames[lTsHeader.mPid];
             if (lEsFrame.mData->size() != 0) {
-                std::cout << "Packet Added - 3: " << videoFrameNumber - 1 << std::endl;
-                packetVector.emplace_back(tsData, true, videoFrameNumber, containsPCR, (containsPCR) ? lPacketPcr : 0);
+                if (frameCompleted) {
+                    std::cout << "Packet Added - 3: " << videoFrameNumber - 1 << std::endl;
+                    packetVector.emplace_back(tsData, true, videoFrameNumber - 1, containsPCR, (containsPCR) ? lPacketPcr : 0);
+                }
+                else {
+                    std::cout << "Packet Added - 4: " << videoFrameNumber << std::endl;
+                    packetVector.emplace_back(tsData, true, videoFrameNumber, containsPCR, (containsPCR) ? lPacketPcr : 0);
+                }
             }
         }
         else {
-            if (frameCompleted) {
-                std::cout << "Packet Added - 4: " << videoFrameNumber << std::endl;
-                packetVector.emplace_back(tsData, false, 0, containsPCR, (containsPCR) ? lPacketPcr : 0);
-            } else {
-                std::cout << "Packet Added - 5 " << videoFrameNumber << std::endl;
-                packetVector.emplace_back(tsData, false, 0, containsPCR, (containsPCR) ? lPacketPcr : 0);
-            }
+            std::cout << "Packet Added - 5: " << 0 << std::endl;
+            packetVector.emplace_back(tsData, false, 0, containsPCR, (containsPCR) ? lPacketPcr : 0);
         }
 #endif
     }
