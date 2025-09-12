@@ -275,9 +275,8 @@ uint8_t MpegTsDemuxer::decode(SimpleBuffer &rIn) {
             lAdaptField.decode(rIn);
 #ifdef IMAX_SCT
             uint64_t lPcr = readPcrFull(rIn);
-            containsPCR = true;
-            lPcr = readPcrFull(rIn);
             lPacketPcr = lPcr;
+            containsPCR = true;
             debugLog("Found PCR %llu for PID: %u, current videoFrameNumber: %d", lPcr, lTsHeader.mPid, videoFrameNumber);
 #else
             uint64_t lPcr = readPcr(rIn);
