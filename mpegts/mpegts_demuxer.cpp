@@ -7,7 +7,7 @@
 // Helper function for logging with format string and variadic arguments
 #include <cstdarg>
 
-//#define DEBUG_LOG 1
+#define DEBUG_LOG 1
 #include <vector>
 
 #ifdef IMAX_SCT
